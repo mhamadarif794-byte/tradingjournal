@@ -1,0 +1,3237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="theme-color" content="#05070b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trade Ledger">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Ledger</title>
+<style>
+  :root{
+    --bg: #05070b;
+    --bg-panel: #0e141e;
+    --bg-panel-2: #131b27;
+    --line: #23303f;
+    --text: #e8edf3;
+    --text-dim: #8a99ab;
+    --text-faint: #56667a;
+    --gold: #d4af37;
+    --gold-dim: #8a7226;
+    --green: #2fbf71;
+    --green-dim: #163c2a;
+    --red: #e5544f;
+    --red-dim: #3c1a1a;
+    --amber: #e0a940;
+    --radius: 3px;
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{ background: var(--bg); }
+  body{
+    background: transparent;
+    color: var(--text);
+    font-family: var(--sans);
+    min-height:100%;
+  }
+  body{
+    padding: 0 20px 80px;
+    max-width: 1180px;
+    margin: 0 auto;
+    position: relative;
+  }
+  ::selection{ background: var(--gold-dim); color: var(--text); }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
+  }
+
+  /* ---------- live market backdrop ---------- */
+  .market-bg{
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background: var(--bg);
+    animation: bg-hue 30s linear infinite;
+  }
+  @keyframes bg-hue{
+    0%{ filter: hue-rotate(0deg) saturate(1); }
+    50%{ filter: hue-rotate(18deg) saturate(1.25); }
+    100%{ filter: hue-rotate(0deg) saturate(1); }
+  }
+  .market-bg .blob{
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(85px);
+    opacity: 0.5;
+    animation: drift 18s ease-in-out infinite alternate, blob-pulse 5s ease-in-out infinite;
+  }
+  .blob.gold{ width: 480px; height: 480px; background: var(--gold); top: -10%; left: -8%; animation-delay: 0s, 0s; }
+  .blob.green{ width: 440px; height: 440px; background: var(--green); bottom: -12%; right: -6%; animation-delay: -6s, -1s; }
+  .blob.blue{ width: 400px; height: 400px; background: #4a8fe8; top: 28%; right: 12%; animation-delay: -12s, -2s; opacity: 0.38; }
+  .blob.rose{ width: 360px; height: 360px; background: #ea5fa0; bottom: 8%; left: 28%; animation-delay: -3s, -3s; opacity: 0.36; }
+  .blob.purple{ width: 380px; height: 380px; background: #9b6ef8; top: 45%; left: 4%; animation-delay: -9s, -4s; opacity: 0.32; }
+  .blob.teal{ width: 340px; height: 340px; background: #34e0c8; top: 4%; right: 30%; animation-delay: -15s, -2.5s; opacity: 0.3; }
+  @keyframes drift{
+    0%{ transform: translate(0,0) scale(1) rotate(0deg); }
+    50%{ transform: translate(-35px,25px) scale(0.92) rotate(8deg); }
+    100%{ transform: translate(55px,-40px) scale(1.18) rotate(-6deg); }
+  }
+  @keyframes blob-pulse{
+    0%, 100%{ filter: blur(85px) brightness(1); }
+    50%{ filter: blur(85px) brightness(1.35); }
+  }
+  .market-bg .chart-line{
+    position: absolute;
+    bottom: 8%;
+    left: 0;
+    width: 220%;
+    height: 240px;
+    opacity: 0.22;
+    animation: chart-scroll 34s linear infinite;
+  }
+  .market-bg .chart-line.two{ bottom: 22%; opacity: 0.13; animation-duration: 46s; animation-direction: reverse; }
+  @keyframes chart-scroll{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(-50%); }
+  }
+  .market-bg .grid-overlay{
+    position:absolute; inset:-40px;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: grid-pan 16s linear infinite;
+  }
+  @keyframes grid-pan{
+    0%{ background-position: 0 0, 0 0; }
+    100%{ background-position: 40px 40px, 40px 40px; }
+  }
+  .market-bg .sparkle{
+    position: absolute;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: sparkle-twinkle ease-in-out infinite;
+  }
+  @keyframes sparkle-twinkle{
+    0%, 100%{ opacity: 0; transform: scale(0.6); }
+    50%{ opacity: 0.9; transform: scale(1.4); }
+  }
+  .sparkle-layer{ position: absolute; inset: 0; }
+  .live-candles{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.85;
+  }
+  .data-col{
+    position: fixed;
+    top: 0; bottom: 0;
+    width: 130px;
+    overflow: hidden;
+    z-index: -1;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
+    opacity: 0.4;
+  }
+  .data-col.left{ left: 0; }
+  .data-col.right{ right: 0; }
+  .data-col-track{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: data-col-scroll linear infinite;
+  }
+  .data-col.right .data-col-track{ animation-direction: reverse; }
+  .data-col-track span{
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 10px;
+  }
+  @keyframes data-col-scroll{
+    from{ transform: translateY(0); }
+    to{ transform: translateY(-50%); }
+  }
+  .market-bg .vignette{
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, transparent 40%, var(--bg) 92%);
+  }
+  .floating-num{
+    position: fixed;
+    z-index: -1;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    opacity: 0;
+    animation: float-up 6s ease-out forwards;
+    white-space: nowrap;
+  }
+  .floating-num.up{ color: var(--green); text-shadow: 0 0 10px rgba(47,191,113,0.4); }
+  .floating-num.down{ color: var(--red); text-shadow: 0 0 10px rgba(229,84,79,0.35); }
+  @keyframes float-up{
+    0%{ opacity: 0; transform: translateY(0) scale(0.9); }
+    8%{ opacity: 0.85; transform: translateY(-6px) scale(1); }
+    85%{ opacity: 0.55; }
+    100%{ opacity: 0; transform: translateY(-180px) scale(1); }
+  }
+
+  /* ---------- hero banner ---------- */
+  .hero{
+    position: relative;
+    margin: 0 -20px 28px;
+    padding: 30px 20px 0;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 90% at 15% 0%, rgba(212,175,55,0.10), transparent 60%),
+      radial-gradient(ellipse 50% 80% at 100% 20%, rgba(47,191,113,0.07), transparent 60%),
+      rgba(12,17,24,0.55);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+  }
+  .hero-grid{
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), transparent 85%);
+    pointer-events:none;
+  }
+  .hero-inner{
+    position: relative;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-bottom: 0;
+  }
+  .ticker-row{
+    display:flex;
+    overflow:hidden;
+    border-top: 1px solid var(--line);
+    margin-top: 22px;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .ticker-track{
+    display:flex;
+    gap: 36px;
+    padding: 10px 0;
+    white-space: nowrap;
+    animation: ticker-scroll 26s linear infinite;
+  }
+  .ticker-track span{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    display:inline-flex;
+    align-items:center;
+    gap: 6px;
+  }
+  .ticker-track .up{ color: var(--green); }
+  .ticker-track .down{ color: var(--red); }
+  @keyframes ticker-scroll{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(-50%); }
+  }
+
+  .candles{
+    display:flex;
+    align-items:flex-end;
+    gap: 5px;
+    height: 76px;
+    padding-top: 6px;
+  }
+  .candle{
+    width: 6px;
+    border-radius: 1px;
+    transform-origin: bottom;
+    animation: candle-rise 1.1s cubic-bezier(.2,.8,.2,1) both,
+               candle-flicker 4.5s ease-in-out infinite,
+               candle-bob 2.4s ease-in-out infinite;
+    position: relative;
+  }
+  .candle::before{
+    content:'';
+    position:absolute;
+    left: 50%; top: -8px;
+    width: 1px; height: 8px;
+    background: inherit;
+    transform: translateX(-50%);
+  }
+  .candle.g{ background: var(--green); box-shadow: 0 0 8px rgba(47,191,113,0.25); }
+  .candle.r{ background: var(--red); box-shadow: 0 0 8px rgba(229,84,79,0.2); }
+  @keyframes candle-rise{
+    from{ transform: scaleY(0) translateY(0); opacity: 0; }
+    to{ transform: scaleY(1) translateY(0); opacity: 1; }
+  }
+  @keyframes candle-flicker{
+    0%, 100%{ filter: brightness(1); }
+    50%{ filter: brightness(1.18); }
+  }
+  @keyframes candle-bob{
+    0%, 100%{ transform: scaleY(1) translateY(0); }
+    50%{ transform: scaleY(1.18) translateY(-6px); }
+  }
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-bottom: 22px;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap: 10px;
+  }
+  .brand .mark{
+    width: 9px; height: 9px;
+    background: var(--gold);
+    border-radius: 50%;
+    display:inline-block;
+    box-shadow: 0 0 10px var(--gold);
+    transform: translateY(-3px);
+    animation: pulse-mark 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-mark{
+    0%, 100%{ box-shadow: 0 0 6px var(--gold); opacity: 1; }
+    50%{ box-shadow: 0 0 16px var(--gold); opacity: 0.6; }
+  }
+  h1{
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #f3d074, var(--gold), #7ee8c7, var(--gold), #f3d074);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: title-shine 6s linear infinite;
+  }
+  @keyframes title-shine{
+    0%{ background-position: 0% 50%; }
+    100%{ background-position: 300% 50%; }
+  }
+  .subline{
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .header-actions{ display:flex; gap:22px; align-items:center; }
+  .candles{ min-width: 110px; }
+  .balance-edit{
+    display:flex; align-items:center; gap:8px;
+    font-size: 12.5px; color: var(--text-dim);
+  }
+  .balance-edit input{
+    width: 110px;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+  }
+
+  /* ---------- stat strip ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow:hidden;
+    margin-bottom: 28px;
+  }
+  .stat{
+    background: rgba(18,25,36,0.55);
+    backdrop-filter: blur(16px);
+    padding: 16px 18px;
+    position: relative;
+    opacity: 0;
+    animation: rise-in .5s ease forwards;
+    overflow: hidden;
+  }
+  .stat::after{
+    content:'';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    background-size: 200% 100%;
+    animation: underline-flow 3.6s linear infinite;
+    opacity: 0.6;
+  }
+  .stat:nth-child(2)::after{ background: linear-gradient(90deg, transparent, var(--green), transparent); background-size: 200% 100%; }
+  .stat:nth-child(3)::after{ background: linear-gradient(90deg, transparent, #5fa8e8, transparent); background-size: 200% 100%; }
+  .stat:nth-child(4)::after{ background: linear-gradient(90deg, transparent, #9b6ef8, transparent); background-size: 200% 100%; }
+  .stat:nth-child(5)::after{ background: linear-gradient(90deg, transparent, #34e0c8, transparent); background-size: 200% 100%; }
+  @keyframes underline-flow{
+    0%{ background-position: 200% 0; }
+    100%{ background-position: -200% 0; }
+  }
+  .stat:nth-child(1){ animation-delay: .02s; }
+  .stat:nth-child(2){ animation-delay: .08s; }
+  .stat:nth-child(3){ animation-delay: .14s; }
+  .stat:nth-child(4){ animation-delay: .20s; }
+  .stat:nth-child(5){ animation-delay: .26s; }
+  @keyframes rise-in{
+    from{ opacity: 0; transform: translateY(6px); }
+    to{ opacity: 1; transform: translateY(0); }
+  }
+  .stat .value{ transition: color .3s ease; }
+  .stat .label{
+    font-size: 10.5px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .stat .value{
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    transition: color .3s ease;
+  }
+  .stat .value.pos{ color: var(--green); }
+  .stat .value.neg{ color: var(--red); }
+  .stat .value.gold{
+    background: linear-gradient(120deg, #f3d074, var(--gold) 55%, #b8912c);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 22px;
+  }
+  .stat .sub{ font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+
+  .stat-primary{
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-primary::before{
+    content:'';
+    position: absolute;
+    top: 0; left: -60%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(212,175,55,0.16), transparent);
+    animation: balance-sweep 3.2s ease-in-out infinite;
+  }
+  @keyframes balance-sweep{
+    0%{ left: -60%; }
+    100%{ left: 120%; }
+  }
+  .stat-primary .value.gold{
+    animation: balance-glow 2.6s ease-in-out infinite;
+  }
+  @keyframes balance-glow{
+    0%, 100%{ filter: drop-shadow(0 0 0 rgba(212,175,55,0)); }
+    50%{ filter: drop-shadow(0 0 6px rgba(212,175,55,0.55)); }
+  }
+  .stat-primary .label::after{
+    content: '●';
+    color: var(--green);
+    font-size: 8px;
+    margin-left: 7px;
+    display: inline-block;
+    animation: live-blink 1.8s ease-in-out infinite;
+    vertical-align: middle;
+  }
+  @keyframes live-blink{
+    0%, 100%{ opacity: 1; }
+    50%{ opacity: 0.25; }
+  }
+
+  @media (max-width: 820px){
+    .stats{ grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* ---------- add trade panel ---------- */
+  .panel{
+    background: rgba(18,25,36,0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  .panel::before{
+    content:'';
+    position: absolute;
+    inset: -1px;
+    border-radius: 7px;
+    padding: 1px;
+    background: linear-gradient(120deg, var(--gold), #34e0c8, #9b6ef8, var(--gold));
+    background-size: 300% 300%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.35;
+    animation: border-shine 8s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes border-shine{
+    0%{ background-position: 0% 50%; }
+    100%{ background-position: 300% 50%; }
+  }
+  .panel-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 14px 18px;
+    cursor: pointer;
+    user-select:none;
+  }
+  .panel-head h2{
+    font-size: 14px; font-weight: 600;
+    display:flex; align-items:center; gap: 8px;
+  }
+  .panel-head h2::before{
+    content:'+';
+    color: var(--gold);
+    font-size: 16px;
+    font-weight: 400;
+  }
+  .chev{ color: var(--text-faint); transition: transform .2s ease; font-size: 12px; }
+  .panel.open .chev{ transform: rotate(180deg); }
+  .panel-body{
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .28s ease;
+  }
+  .panel.open .panel-body{ max-height: 900px; }
+  .form-grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    padding: 4px 18px 18px;
+    position: relative;
+  }
+  .form-grid::before{
+    content:'';
+    position: absolute;
+    inset: -10px -18px;
+    z-index: -1;
+    background:
+      radial-gradient(ellipse 45% 60% at 8% 10%, rgba(212,175,55,0.10), transparent 65%),
+      radial-gradient(ellipse 40% 55% at 95% 90%, rgba(47,191,113,0.08), transparent 65%),
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 14px);
+    animation: form-glow-shift 9s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes form-glow-shift{
+    0%{ opacity: 0.7; transform: translateY(0); }
+    100%{ opacity: 1; transform: translateY(6px); }
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field.wide{ grid-column: span 2; }
+  .field.wide-full{ grid-column: 1 / -1; }
+  .field label{
+    font-size: 10.5px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .field input, .field select, .field textarea{
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    outline: none;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-color: var(--gold-dim);
+  }
+  .field input[type="number"]{ font-family: var(--mono); }
+  .field .day-readout{
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--text-dim);
+    padding: 9px 10px;
+    border: 1px solid transparent;
+  }
+  .field label .hint{ text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 10px; font-weight: 400; }
+
+  .chip-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 8px 7px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--bg-panel-2);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all .15s ease;
+    user-select: none;
+  }
+  .chip:hover{ border-color: var(--text-faint); color: var(--text); }
+  .chip.active{
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .chip .chip-x{
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--text-faint);
+    background: rgba(255,255,255,0.06);
+    line-height: 1;
+  }
+  .chip .chip-x:hover{ background: var(--red-dim); color: var(--red); }
+  .chip.add-chip{
+    border-style: dashed;
+    color: var(--text-faint);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .chip.add-chip:hover{ color: var(--gold); border-color: var(--gold-dim); }
+  .chip-add-row{
+    display: none;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .chip-add-row.open{ display: flex; }
+  .chip-add-row input{
+    flex: 1;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 13.5px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    outline: none;
+  }
+  .btn-small{ padding: 9px 16px; font-size: 12.5px; white-space: nowrap; }
+
+  .tab-nav{
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .tab-btn{
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all .15s ease;
+  }
+  .tab-btn:hover{ color: var(--text-dim); }
+  .tab-btn.active{ color: var(--gold); border-bottom-color: var(--gold); }
+
+  .admin-user-list{ display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 6px; overflow: hidden; }
+  .admin-user-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(18,25,36,0.6);
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .admin-user-row:hover{ background: rgba(212,175,55,0.08); }
+  .admin-user-row.active-row{ background: rgba(212,175,55,0.14); }
+  .admin-user-name{ font-weight: 600; font-size: 13.5px; }
+  .admin-user-name .you-tag{ font-size: 10px; color: var(--gold); margin-left: 6px; font-weight: 600; }
+  .admin-user-meta{ display: flex; gap: 18px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .admin-user-meta .bal-pos{ color: var(--green); }
+  .admin-user-meta .bal-neg{ color: var(--red); }
+  .admin-detail-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-detail-head strong{ color: var(--gold); }
+  .admin-loading{ padding: 20px; color: var(--text-faint); font-size: 12.5px; text-align: center; }
+
+  .access-code-list{ display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 6px; overflow: hidden; }
+  .access-code-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 16px;
+    background: rgba(18,25,36,0.6);
+  }
+  .access-code-val{
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+  }
+  .access-code-row.used .access-code-val{ color: var(--text-faint); text-decoration: line-through; }
+  .access-code-status{ font-size: 11.5px; }
+  .access-code-status.avail{ color: var(--green); }
+  .access-code-status.used{ color: var(--text-faint); }
+  .access-code-copy{
+    background: none; border: 1px solid var(--line); color: var(--text-faint);
+    font-size: 11px; padding: 4px 10px; border-radius: var(--radius); cursor: pointer;
+  }
+  .access-code-copy:hover{ color: var(--gold); border-color: var(--gold-dim); }
+
+  .lock-text{ font-size: 13.5px; color: var(--text-dim); line-height: 1.6; margin-bottom: 18px; }
+  .plan-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px){ .plan-grid{ grid-template-columns: 1fr; } }
+  .plan-card{
+    position: relative;
+    background: rgba(18,25,36,0.6);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .plan-card.pro{ border-color: var(--gold); box-shadow: 0 0 22px rgba(212,175,55,0.15); }
+  .plan-badge{
+    position: absolute; top: -10px; right: 14px;
+    background: var(--gold); color: #16130a;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 3px 9px; border-radius: 10px;
+  }
+  .plan-name{ font-size: 14px; font-weight: 700; color: var(--text-dim); }
+  .plan-price{ font-size: 28px; font-weight: 700; margin: 6px 0 12px; color: var(--gold); font-family: var(--mono); }
+  .plan-price span{ font-size: 12px; color: var(--text-faint); font-weight: 400; }
+  .plan-card ul{ list-style: none; display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; color: var(--text-dim); }
+  .plan-card li.no{ color: var(--text-faint); }
+
+  .plan-chip{
+    font-size: 10px; font-weight: 800; letter-spacing: 0.06em;
+    padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+  }
+  .plan-chip.basic{ background: rgba(255,255,255,0.08); color: var(--text-dim); }
+  .plan-chip.pro{ background: var(--gold); color: #16130a; }
+  .auth-user-badge .upgrade-top{
+    background: linear-gradient(120deg, #f3d074, var(--gold));
+    color: #16130a; border: none; font-weight: 700;
+  }
+  .auth-user-badge .upgrade-top:hover{ color: #16130a; filter: brightness(1.1); }
+  .buy-box{
+    margin-top: 20px; padding: 16px 18px;
+    background: rgba(212,175,55,0.05); border: 1px solid var(--gold-dim); border-radius: 8px;
+  }
+  .buy-title{ font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--gold); }
+  .buy-steps{ padding-left: 18px; font-size: 12.5px; color: var(--text-dim); line-height: 1.8; margin-bottom: 14px; }
+  .buy-number{ font-family: var(--mono); color: var(--gold); letter-spacing: 0.03em; }
+  .buy-form{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .buy-form input{
+    flex: 1; min-width: 180px;
+    background: var(--bg-panel-2); border: 1px solid var(--line); color: var(--text);
+    font-size: 13px; padding: 9px 10px; border-radius: var(--radius); outline: none;
+  }
+  .buy-wa{ text-decoration: none; display: inline-block; color: var(--green); border-color: var(--green-dim); }
+  .buy-status{ margin-top: 10px; font-size: 12.5px; color: var(--green); min-height: 16px; }
+  .ci-controls{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  .ci-check{ font-size:12px; color:var(--text-dim); display:flex; align-items:center; gap:6px; }
+  .ci-code{
+    width:100%; min-height:150px; resize:vertical;
+    background:#080c12; color:#cfe3ff; border:1px solid var(--line); border-radius:6px;
+    font-family:var(--mono); font-size:12.5px; line-height:1.5; padding:12px; outline:none;
+  }
+  .ci-status{ font-size:12.5px; margin-top:8px; min-height:16px; color:var(--text-dim); }
+  .ci-status.err{ color:var(--red); }
+  .ci-box{ width:100%; height:420px; margin-top:10px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .ci-box.ci-pane{ height:170px; }
+  .goal-note code{ color:var(--gold); font-family:var(--mono); }
+  .gen-plan-select{
+    background: var(--bg-panel-2); border: 1px solid var(--line); color: var(--text);
+    font-size: 12.5px; padding: 8px 10px; border-radius: var(--radius);
+  }
+  .plan-toggle-btn{
+    background: none; border: 1px solid var(--line); color: var(--text-faint);
+    font-size: 11px; padding: 4px 10px; border-radius: var(--radius); cursor: pointer;
+  }
+  .plan-toggle-btn:hover{ color: var(--gold); border-color: var(--gold-dim); }
+
+  .risk-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 6px; overflow: hidden; margin-top: 4px; }
+  .risk-cell{ background: rgba(18,25,36,0.6); padding: 14px 16px; }
+  .risk-cell span{ display:block; font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .risk-cell strong{ font-family: var(--mono); font-size: 18px; color: var(--gold); }
+  #riskResult{ padding: 0 18px 18px; }
+
+  .chart-wrap{
+    width: 100%;
+    height: 72vh;
+    min-height: 480px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  #tvChartContainer{ width: 100%; height: 100%; }
+  #tvChartContainer iframe{ border: none; }
+
+  .goal-error{ color: var(--red); font-size: 13px; margin-top: 14px; }
+  .goal-summary{
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: rgba(212,175,55,0.06);
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .gold-text{ color: var(--gold); }
+  .goal-rows{ display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 6px; overflow: hidden; margin-top: 14px; }
+  .goal-row{
+    display: grid;
+    grid-template-columns: 90px repeat(3, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(18,25,36,0.55);
+  }
+  .goal-row-num{ font-weight: 700; color: var(--gold); font-size: 13px; }
+  .goal-row-item{ display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+  .goal-row-item span{ color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .goal-row-item strong{ font-size: 13.5px; }
+  .goal-note{ margin-top: 14px; font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
+  @media (max-width: 700px){
+    .goal-row{ grid-template-columns: 1fr 1fr; }
+  }
+
+  .backup-bar{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: rgba(18,25,36,0.4);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .backup-hint{ font-size: 11.5px; color: var(--text-faint); }
+  .backup-actions{ display: flex; gap: 8px; }
+  @media (max-width: 620px){
+    .backup-bar{ flex-direction: column; align-items: flex-start; }
+  }
+  .result-toggle{ display:flex; gap: 8px; }
+  .result-toggle button{
+    flex:1;
+    padding: 9px 4px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--bg-panel-2);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+  }
+  .result-toggle button[data-r="TP"].active{ background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .result-toggle button[data-r="SL"].active{ background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .result-toggle button[data-r="BE"].active{ background: #2a2617; border-color: var(--amber); color: var(--amber); }
+
+  .form-footer{
+    display:flex; justify-content: flex-end; gap: 10px;
+    padding: 0 18px 20px;
+  }
+  .btn{
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text-dim);
+    transition: all .15s ease;
+  }
+  .btn-primary{
+    background: linear-gradient(120deg, #2fbf71, #1f9dbf);
+    border-color: #2fbf71;
+    color: #06140e;
+  }
+  .btn-primary:hover{ filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(47,191,113,0.3); }
+  .btn-primary:active{ transform: translateY(0); }
+  .btn:hover{ border-color: var(--text-faint); color: var(--text); }
+  .btn-primary.saved{ animation: save-pop .4s ease; }
+  @keyframes save-pop{
+    0%{ transform: scale(1); }
+    40%{ transform: scale(0.94); }
+    100%{ transform: scale(1); }
+  }
+
+  .result-toggle button{ transition: all .15s ease; }
+  .result-toggle button:hover{ border-color: var(--text-faint); }
+  .result-toggle button.active{ animation: save-pop .3s ease; }
+
+  /* ---------- table ---------- */
+  .table-wrap{
+    background: rgba(18,25,36,0.5);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  table{ width: 100%; border-collapse: collapse; min-width: 920px; }
+  thead th{
+    text-align: left;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-faint);
+    font-weight: 600;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td{
+    padding: 12px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td{ border-bottom: none; }
+  tbody tr{ transition: background .15s ease; animation: row-in .35s ease both; }
+  tbody tr:hover{ background: rgba(255,255,255,0.03); }
+  @keyframes row-in{
+    from{ opacity: 0; transform: translateY(4px); }
+    to{ opacity: 1; transform: translateY(0); }
+  }
+  .pair-tag{
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .pair-tag.xau{ color: var(--gold); }
+  .pair-tag.eur{ color: #5fa8e8; }
+  .pair-tag.btc{ color: #e88f4f; }
+  .mono{ font-family: var(--mono); }
+  .badge{
+    display:inline-block;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .badge.TP{ background: var(--green-dim); color: var(--green); }
+  .badge.SL{ background: var(--red-dim); color: var(--red); }
+  .badge.BE{ background: #2a2617; color: var(--amber); }
+  .pl-pos{ color: var(--green); font-family: var(--mono); font-weight:600; }
+  .pl-neg{ color: var(--red); font-family: var(--mono); font-weight:600; }
+  .bal-cell{ font-family: var(--mono); color: var(--text-dim); }
+  .row-actions{ display: flex; gap: 4px; }
+  .row-del, .row-edit{
+    background: none; border: none; color: var(--text-faint);
+    cursor: pointer; font-size: 15px; padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .row-del:hover{ color: var(--red); background: var(--red-dim); }
+  .row-edit:hover{ color: var(--gold); background: var(--gold-dim); }
+  tr.editing-row{ background: rgba(212,175,55,0.06); }
+  .empty-state{
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 13.5px;
+  }
+  .empty-state .big{
+    font-size: 14px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600;
+  }
+
+  .toast{
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px) scale(0.96);
+    background: var(--bg-panel-2);
+    border: 1px solid var(--gold-dim);
+    color: var(--text);
+    padding: 11px 20px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all .3s cubic-bezier(.2,.8,.2,1);
+    z-index: 50;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  }
+  .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  .toast::before{ content: '●  '; color: var(--gold); }
+
+  .confetti-piece{
+    position: fixed;
+    z-index: 60;
+    width: 7px; height: 7px;
+    border-radius: 1px;
+    pointer-events: none;
+    animation: confetti-fall 1.1s ease-out forwards;
+  }
+  @keyframes confetti-fall{
+    0%{ opacity: 1; transform: translate(0,0) rotate(0deg) scale(1); }
+    100%{ opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.5); }
+  }
+
+  @media (max-width: 760px){
+    .form-grid{ grid-template-columns: repeat(2, 1fr); }
+    .field.wide{ grid-column: span 2; }
+    .stats{ grid-template-columns: repeat(2,1fr); }
+  }
+  /* ---------- auth overlay ---------- */
+  .auth-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5,7,11,0.88);
+    backdrop-filter: blur(6px);
+    padding: 20px;
+  }
+  .auth-overlay.hidden{ display: none; }
+  .auth-card{
+    width: 100%;
+    max-width: 360px;
+    background: rgba(18,25,36,0.85);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 28px 26px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .auth-brand{ display:flex; align-items:baseline; gap:10px; margin-bottom: 6px; }
+  .auth-brand .mark{
+    width: 9px; height: 9px;
+    background: var(--gold);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--gold);
+    animation: pulse-mark 2.4s ease-in-out infinite;
+  }
+  .auth-brand h1{
+    font-size: 20px;
+    background: linear-gradient(120deg, #f3d074, var(--gold) 55%, #b8912c);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .auth-sub{ font-size: 12.5px; color: var(--text-dim); margin-bottom: 20px; }
+  .auth-tabs{
+    display: flex;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .auth-tab{
+    flex: 1;
+    padding: 9px 0;
+    background: var(--bg-panel-2);
+    border: none;
+    color: var(--text-faint);
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .auth-tab.active{ background: var(--gold-dim); color: var(--gold); }
+  .auth-card .field{ margin-bottom: 14px; }
+  .pw-wrap{ position: relative; }
+  .pw-wrap input{ padding-right: 40px; width: 100%; }
+  .pw-eye{
+    position: absolute;
+    right: 4px; top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 6px 8px;
+    opacity: 0.55;
+    filter: grayscale(1);
+  }
+  .pw-eye:hover{ opacity: 1; }
+  .pw-eye.showing{ opacity: 1; filter: none; }
+
+  .captcha-field .hint{ text-transform: none; letter-spacing: 0; color: var(--text-faint); font-size: 10px; font-weight: 400; }
+  .captcha-row{ display: flex; align-items: center; gap: 8px; }
+  .captcha-q{
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gold);
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .captcha-row input{
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: 13.5px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    outline: none;
+  }
+  .captcha-refresh{
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-faint);
+    font-size: 15px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .captcha-refresh:hover{ color: var(--gold); border-color: var(--gold-dim); }
+  .auth-error{
+    font-size: 12px;
+    color: var(--red);
+    min-height: 16px;
+    margin-bottom: 6px;
+  }
+  .auth-submit{ width: 100%; margin-top: 6px; }
+  .auth-user-badge{
+    display:flex; align-items:center; gap:8px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .auth-user-badge button{
+    background: none; border: 1px solid var(--line);
+    color: var(--text-faint);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .auth-user-badge button:hover{ color: var(--red); border-color: var(--red-dim); }
+
+  /* ---- admin mode: distinct look so it never feels like a regular account ---- */
+  body.admin-mode .hero{
+    background:
+      radial-gradient(ellipse 60% 90% at 15% 0%, rgba(229,84,79,0.14), transparent 60%),
+      radial-gradient(ellipse 50% 80% at 100% 20%, rgba(212,175,55,0.10), transparent 60%),
+      rgba(12,17,24,0.55);
+    border-bottom: 1px solid rgba(229,84,79,0.35);
+  }
+  body.admin-mode .brand .mark{
+    background: #e5544f;
+    box-shadow: 0 0 10px #e5544f;
+    animation: pulse-mark-admin 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-mark-admin{
+    0%, 100%{ box-shadow: 0 0 6px #e5544f; opacity: 1; }
+    50%{ box-shadow: 0 0 18px #e5544f; opacity: 0.6; }
+  }
+  .admin-user-badge{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px 5px 8px;
+    border-radius: 20px;
+    background: linear-gradient(120deg, rgba(229,84,79,0.18), rgba(212,175,55,0.14));
+    border: 1px solid rgba(229,84,79,0.5);
+    color: #f3b8b5;
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+    animation: admin-badge-glow 3s ease-in-out infinite;
+  }
+  @keyframes admin-badge-glow{
+    0%, 100%{ box-shadow: 0 0 0 rgba(229,84,79,0); }
+    50%{ box-shadow: 0 0 12px rgba(229,84,79,0.35); }
+  }
+  body.admin-mode .tab-btn[data-tab="admin"]{
+    color: #f3b8b5;
+  }
+  body.admin-mode .tab-btn[data-tab="admin"].active{
+    color: #e5544f;
+    border-bottom-color: #e5544f;
+  }
+  .admin-strip{
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(90deg, rgba(229,84,79,0.12), rgba(212,175,55,0.08));
+    border: 1px solid rgba(229,84,79,0.35);
+    color: #f3b8b5;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 8px 14px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  body.admin-mode .admin-strip{ display: flex; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-brand"><span class="mark"></span><h1>Trade Ledger</h1></div>
+    <p class="auth-sub" id="authSub">Apna naam aur code daal ke journal kholo</p>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-mode="login">Log in</button>
+      <button type="button" class="auth-tab" data-mode="signup">Sign up</button>
+    </div>
+
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="authName" placeholder="Apna naam likho" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label id="authCodeLabel">Code</label>
+      <div class="pw-wrap">
+        <input type="password" id="authCode" placeholder="Apna code likho" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="pw-eye" data-target="authCode" title="Show/hide">👁</button>
+      </div>
+    </div>
+    <div class="field" id="authCodeConfirmWrap" style="display:none;">
+      <label>Confirm code</label>
+      <div class="pw-wrap">
+        <input type="password" id="authCodeConfirm" placeholder="Code dobara likho" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button type="button" class="pw-eye" data-target="authCodeConfirm" title="Show/hide">👁</button>
+      </div>
+    </div>
+
+    <div class="field" id="accessCodeWrap" style="display:none;">
+      <label>Access code <span class="hint">(ye account owner se milega)</span></label>
+      <input type="text" id="accessCodeInput" placeholder="Apna invite/access code likho" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+
+    <div class="field captcha-field">
+      <label>Verification <span class="hint">(robot nahi ho iske liye)</span></label>
+      <div class="captcha-row">
+        <span class="captcha-q" id="captchaQ">? + ? =</span>
+        <input type="text" id="captchaAnswer" inputmode="numeric" placeholder="Jawab likho" autocomplete="off">
+        <button type="button" class="captcha-refresh" id="captchaRefresh" title="Naya sawal">↻</button>
+      </div>
+    </div>
+
+    <div class="auth-error" id="authError"></div>
+
+    <button class="btn btn-primary auth-submit" id="authSubmit">Log in</button>
+  </div>
+</div>
+
+<div class="market-bg" id="marketBg">
+  <div class="grid-overlay"></div>
+  <div class="sparkle-layer" id="sparkleLayer"></div>
+  <div class="blob gold"></div>
+  <div class="blob green"></div>
+  <div class="blob blue"></div>
+  <div class="blob rose"></div>
+  <div class="blob purple"></div>
+  <div class="blob teal"></div>
+  <canvas class="live-candles" id="liveCandles"></canvas>
+  <svg class="chart-line" viewBox="0 0 1200 240" preserveAspectRatio="none">
+    <path d="M0,150 L40,140 L80,160 L120,110 L160,130 L200,90 L240,120 L280,80 L320,100 L360,60 L400,95 L440,70 L480,110 L520,85 L560,120 L600,95 L640,135 L680,105 L720,150 L760,120 L800,160 L840,130 L880,170 L920,140 L960,180 L1000,150 L1040,190 L1080,160 L1120,200 L1160,175 L1200,150 L1240,140 L1280,160 L1320,110 L1360,130 L1400,90 L1440,120 L1480,80 L1520,100 L1560,60 L1600,95 L1640,70 L1680,110 L1720,85 L1760,120 L1800,95 L1840,135 L1880,105 L1920,150 L1960,120 L2000,160 L2040,130 L2080,170 L2120,140 L2160,180 L2200,150 L2240,190 L2280,160 L2320,200 L2360,175 L2400,150"
+      fill="none" stroke="#2fbf71" stroke-width="2"/>
+  </svg>
+  <svg class="chart-line two" viewBox="0 0 1200 240" preserveAspectRatio="none">
+    <path d="M0,110 L50,130 L100,95 L150,140 L200,100 L250,150 L300,120 L350,160 L400,130 L450,90 L500,125 L550,80 L600,115 L650,75 L700,105 L750,65 L800,100 L850,60 L900,95 L950,55 L1000,90 L1050,50 L1100,85 L1150,45 L1200,80 L1250,110 L1300,130 L1350,95 L1400,140 L1450,100 L1500,150 L1550,120 L1600,160 L1650,130 L1700,90 L1750,125 L1800,80 L1850,115 L1900,75 L1950,105 L2000,65 L2050,100 L2100,60 L2150,95 L2200,55 L2250,90 L2300,50 L2350,85 L2400,45"
+      fill="none" stroke="#d4af37" stroke-width="1.5"/>
+  </svg>
+  <div class="vignette"></div>
+</div>
+
+<div class="data-col left" id="dataColLeft"><div class="data-col-track" id="dataColLeftTrack"></div></div>
+<div class="data-col right" id="dataColRight"><div class="data-col-track" id="dataColRightTrack"></div></div>
+
+<div class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <header>
+      <div>
+        <div class="brand"><span class="mark"></span><h1>Trade Ledger</h1></div>
+        <div class="subline" id="subline">Loading history…</div>
+      </div>
+      <div class="header-actions">
+        <div class="candles" id="candles"></div>
+        <div class="balance-edit">
+          <span>Starting balance</span>
+          <input type="number" id="startBalance" step="0.01" placeholder="0.00">
+        </div>
+        <div class="auth-user-badge" id="userBadge">
+          <span id="adminCrown" style="display:none;">👑</span>
+          <span id="currentUserLabel">—</span>
+          <span id="planChip" class="plan-chip basic">BASIC</span>
+          <button type="button" id="btnUpgradeTop" class="upgrade-top">💎 Upgrade</button>
+          <button type="button" id="btnInstall" class="upgrade-top" style="display:none;">📲 Install app</button>
+          <button type="button" id="btnLogout">Logout</button>
+        </div>
+      </div>
+    </header>
+    <div class="ticker-row">
+      <div class="ticker-track" id="tickerTrack"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-nav" id="tabNav">
+  <button type="button" class="tab-btn active" data-tab="journal">📓 Journal</button>
+  <button type="button" class="tab-btn" data-tab="chart">📈 Chart</button>
+  <button type="button" class="tab-btn" data-tab="goal">🎯 Goal Planner</button>
+  <button type="button" class="tab-btn admin-only" data-tab="admin" style="display:none;">🛡️ All Users</button>
+</div>
+
+<div class="tab-view" id="view-journal">
+<div class="admin-strip">👑 Admin mode — ye tumhara apna journal hai. Sab users ka data "All Users" tab mein hai.</div>
+<div class="backup-bar">
+  <span class="backup-hint">Data sirf is browser mein save hai — safe rakhne ke liye backup lelo</span>
+  <div class="backup-actions">
+    <button type="button" class="btn btn-small" id="btnExportBackup">⬇ Export backup</button>
+    <button type="button" class="btn btn-small" id="btnImportBackup">⬆ Import backup</button>
+    <input type="file" id="fileImportBackup" accept="application/json" style="display:none;">
+  </div>
+</div>
+<div class="stats">
+  <div class="stat stat-primary">
+    <div class="label">Account balance</div>
+    <div class="value gold" id="statBalance">$0.00</div>
+  </div>
+  <div class="stat">
+    <div class="label">Net P/L</div>
+    <div class="value" id="statNet">$0.00</div>
+  </div>
+  <div class="stat">
+    <div class="label">Win rate</div>
+    <div class="value" id="statWinRate">—</div>
+    <div class="sub" id="statWinSub">0 TP · 0 SL</div>
+  </div>
+  <div class="stat">
+    <div class="label">Total trades</div>
+    <div class="value" id="statCount">0</div>
+  </div>
+  <div class="stat">
+    <div class="label">Best / worst</div>
+    <div class="value" id="statBestWorst" style="font-size:15px;">—</div>
+  </div>
+</div>
+
+<div class="panel open" id="panel">
+  <div class="panel-head" id="panelToggle">
+    <h2>Add trade</h2>
+    <span class="chev">▾</span>
+  </div>
+  <div class="panel-body">
+    <div class="form-grid">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field">
+        <label>Day</label>
+        <div class="day-readout" id="fDay">—</div>
+      </div>
+      <div class="field">
+        <label>Pair</label>
+        <select id="fPair">
+          <option value="XAU/USD">XAU/USD</option>
+          <option value="EUR/USD">EUR/USD</option>
+          <option value="BTC/USD">BTC/USD</option>
+          <option value="__custom">+ Custom pair…</option>
+        </select>
+      </div>
+      <div class="field" id="fPairCustomWrap" style="display:none;">
+        <label>Custom pair</label>
+        <input type="text" id="fPairCustom" placeholder="e.g. GBP/USD">
+      </div>
+      <div class="field">
+        <label>Timeframe</label>
+        <input type="text" id="fTimeframe" placeholder="e.g. 15+5">
+      </div>
+
+      <div class="field wide-full">
+        <label>Setup / trade logic</label>
+        <div class="chip-row" id="setupChips"></div>
+        <div class="chip-add-row" id="setupAddRow">
+          <input type="text" id="fSetupNew" placeholder="Naya setup likho…">
+          <button type="button" class="btn btn-primary btn-small" id="btnSaveSetup">Save</button>
+        </div>
+      </div>
+
+      <div class="field wide">
+        <label>Result</label>
+        <div class="result-toggle">
+          <button type="button" data-r="TP">TP — Take Profit</button>
+          <button type="button" data-r="SL">SL — Stop Loss</button>
+          <button type="button" data-r="BE">BE — Breakeven</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Profit / Loss ($)</label>
+        <input type="number" id="fPL" step="0.01" placeholder="e.g. -25 or 60">
+      </div>
+      <div class="field">
+        <label>Balance after trade</label>
+        <div class="day-readout" id="fBalPreview">—</div>
+      </div>
+
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Notes (optional)</label>
+        <input type="text" id="fNotes" placeholder="Session, confirmation candle, mistake, etc.">
+      </div>
+    </div>
+    <div class="form-footer">
+      <button class="btn" id="btnCancelEdit" style="display:none;">Cancel edit</button>
+      <button class="btn" id="btnClear">Clear</button>
+      <button class="btn btn-primary" id="btnAdd">Save trade</button>
+    </div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Day</th>
+        <th>Pair</th>
+        <th>TF</th>
+        <th>Setup</th>
+        <th>Result</th>
+        <th>P/L</th>
+        <th>Balance</th>
+        <th>Notes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty-state" id="emptyState" style="display:none;">
+    <div class="big">Koi trade abhi tak record nahi hui</div>
+    <div>Upar "Add trade" mein details bhar ke apni pehli entry save karo.</div>
+  </div>
+</div>
+</div><!-- /view-journal -->
+
+<div class="tab-view" id="view-goal" style="display:none;">
+  <div class="panel open">
+    <div class="panel-head"><h2>Goal Planner</h2></div>
+    <div class="panel-body" style="max-height:none;">
+      <div class="form-grid" style="grid-template-columns: repeat(3,1fr);">
+        <div class="field">
+          <label>Current account balance ($)</label>
+          <input type="number" id="gBalance" step="0.01" placeholder="e.g. 1000">
+        </div>
+        <div class="field">
+          <label>Target profit ($)</label>
+          <input type="number" id="gTarget" step="0.01" placeholder="e.g. 100">
+        </div>
+        <div class="field">
+          <label>Kitne trades mein</label>
+          <input type="number" id="gTrades" min="1" step="1" placeholder="e.g. 3">
+        </div>
+        <div class="field">
+          <label>Risk : Reward ratio</label>
+          <select id="gRR">
+            <option value="1">1 : 1</option>
+            <option value="2" selected>1 : 2</option>
+            <option value="3">1 : 3</option>
+            <option value="4">1 : 4</option>
+          </select>
+        </div>
+        <div class="field" style="grid-column: span 2; align-self:flex-end;">
+          <button class="btn btn-primary" id="btnCalcGoal" style="width:100%;">Plan banao</button>
+        </div>
+      </div>
+      <div id="goalResult"></div>
+    </div>
+  </div>
+</div><!-- /view-goal -->
+
+<div class="tab-view" id="view-chart" style="display:none;">
+
+  <div id="chartLocked" style="display:none;">
+    <div class="panel open">
+      <div class="panel-head"><h2>🔒 Pro feature</h2></div>
+      <div class="panel-body" style="max-height:none; padding: 0 18px 20px;">
+        <p class="lock-text">Live TradingView chart aur Risk Calculator sirf <strong>Pro</strong> plan walon ke liye hain. Apna plan upgrade karne ke liye account owner se rabta karo.</p>
+        <div class="plan-grid">
+          <div class="plan-card">
+            <div class="plan-name">Basic</div>
+            <div class="plan-price">$1<span>/month</span></div>
+            <ul>
+              <li>✓ Trade journal (unlimited trades)</li>
+              <li>✓ Edit / delete trades</li>
+              <li>✓ Goal Planner</li>
+              <li>✓ Backup / restore</li>
+              <li class="no">✕ Live TradingView chart</li>
+              <li class="no">✕ Risk / lot-size calculator</li>
+            </ul>
+          </div>
+          <div class="plan-card pro">
+            <div class="plan-badge">BEST</div>
+            <div class="plan-name">Pro</div>
+            <div class="plan-price">$5<span>/month</span></div>
+            <ul>
+              <li>✓ Basic ka sab kuch</li>
+              <li>✓ Live TradingView chart (sab tools)</li>
+              <li>✓ Risk / lot-size calculator</li>
+              <li>✓ Naye advanced features pehle milenge</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="buy-box">
+          <div class="buy-title">💳 Plan kharidne ka tareeqa</div>
+          <ol class="buy-steps">
+            <li>Neeche plan select karke <strong>"Request bhejo"</strong> dabao (ya seedha WhatsApp karo).</li>
+            <li>Payment <strong>kisi bhi tareeqe se</strong> (Easypaisa, JazzCash, bank transfer, SadaPay, NayaPay waghera) is number par bhejo ya baat karo: <strong class="buy-number">03348024647</strong></li>
+            <li>Apna <strong>account ka naam</strong> (<span id="buyUserName" class="gold-text">—</span>) is number par bhejo — owner tumhara plan activate kar dega.</li>
+          </ol>
+          <div class="buy-form">
+            <select id="reqPlan" class="gen-plan-select">
+              <option value="pro">Pro — $5</option>
+              <option value="basic">Basic — $1</option>
+            </select>
+            <input type="text" id="reqNote" placeholder="Payment kis tareeqe/number se ki / transaction ID (optional)">
+            <button type="button" class="btn btn-primary btn-small" id="btnSendRequest">Request bhejo</button>
+            <a class="btn btn-small buy-wa" id="btnWhatsApp" href="#" target="_blank" rel="noopener">💬 WhatsApp</a>
+          </div>
+          <div class="buy-status" id="reqStatus"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chartPro" style="display:none;">
+    <div class="panel open">
+      <div class="panel-head"><h2>🧮 Risk / Lot-size calculator</h2></div>
+      <div class="panel-body" style="max-height:none;">
+        <div class="form-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="field">
+            <label>Account balance ($)</label>
+            <input type="number" id="rcBalance" step="0.01" placeholder="e.g. 1000">
+          </div>
+          <div class="field">
+            <label>Risk per trade (%)</label>
+            <input type="number" id="rcRisk" step="0.1" value="1">
+          </div>
+          <div class="field">
+            <label>Stop loss (pips / points)</label>
+            <input type="number" id="rcSL" step="0.1" placeholder="e.g. 50">
+          </div>
+          <div class="field">
+            <label>Pair</label>
+            <select id="rcPair">
+              <option value="XAU/USD">XAU/USD (Gold)</option>
+              <option value="EUR/USD">EUR/USD</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-footer" style="padding-top:0;">
+          <button type="button" class="btn btn-primary" id="btnCalcRisk">Calculate</button>
+        </div>
+        <div id="riskResult"></div>
+      </div>
+    </div>
+
+    <div class="panel open">
+      <div class="panel-head"><h2>🧪 Custom indicator (apna code chalao)</h2></div>
+      <div class="panel-body" style="max-height:none; padding: 0 18px 18px;">
+        <div class="ci-controls">
+          <select id="ciSymbol" class="gen-plan-select">
+            <option value="PAXGUSDT">Gold (PAXG/USDT)</option>
+            <option value="EURUSDT">EUR/USD (EUR/USDT)</option>
+            <option value="BTCUSDT">BTC/USDT</option>
+            <option value="ETHUSDT">ETH/USDT</option>
+          </select>
+          <select id="ciInterval" class="gen-plan-select">
+            <option value="5m">5m</option>
+            <option value="15m" selected>15m</option>
+            <option value="30m">30m</option>
+            <option value="1h">1h</option>
+            <option value="4h">4h</option>
+            <option value="1d">1d</option>
+          </select>
+          <label class="ci-check"><input type="checkbox" id="ciPane"> Alag pane (RSI jaise)</label>
+          <button type="button" class="btn btn-primary btn-small" id="btnRunIndicator">▶ Run</button>
+          <button type="button" class="btn btn-small" id="btnPineExample">Pine example</button>
+          <button type="button" class="btn btn-small" id="btnResetIndicator">JS example</button>
+        </div>
+        <textarea id="ciCode" class="ci-code" spellcheck="false"></textarea>
+        <div class="goal-note" style="margin-top:8px;"><strong>TradingView ka Pine Script (v5/v6)</strong> seedha paste karo (<code>//@version=5</code> aur <code>indicator(...)</code> wala) aur Run dabao, ya apna <strong>JavaScript</strong> likho (<code>candles</code>, <code>sma()</code>, <code>ema()</code>, <code>rsi()</code> milte hain, <code>return</code> karo array ya <code>{ 'Naam': array }</code>). Pine mein <code>overlay=false</code> likha ho to indicator neeche alag pane mein dikhega. Sirf wahi code chalao jo tumne ya kisi bharose-mand ne likha ho. Bahut advanced Pine features (strategy, request.security waghera) shayad na chalein.</div>
+        <div class="ci-status" id="ciStatus"></div>
+        <div id="ciChartBox" class="ci-box"></div>
+        <div id="ciPaneBox" class="ci-box ci-pane" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="panel open">
+      <div class="panel-head"><h2>📈 Live chart (TradingView)</h2></div>
+      <div class="panel-body" style="max-height:none;">
+        <div class="chart-wrap">
+          <div id="tvChartContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /view-chart -->
+
+<div class="tab-view" id="view-admin" style="display:none;">
+  <div class="panel open">
+    <div class="panel-head"><h2>Sab registered users</h2></div>
+    <div class="panel-body" style="max-height:none;">
+      <div id="adminUserList" class="admin-user-list"></div>
+    </div>
+  </div>
+  <div class="table-wrap" id="adminDetailWrap" style="display:none; margin-top:18px;">
+    <div class="admin-detail-head" id="adminDetailHead"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Day</th><th>Pair</th><th>TF</th><th>Setup</th><th>Result</th><th>P/L</th><th>Balance</th><th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="adminDetailBody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel open" style="margin-top:18px;">
+    <div class="panel-head"><h2>📩 Upgrade requests</h2></div>
+    <div class="panel-body" style="max-height:none;">
+      <div id="requestList" class="access-code-list"></div>
+    </div>
+  </div>
+
+  <div class="panel open" style="margin-top:18px;">
+    <div class="panel-head">
+      <h2>🔑 Access codes (becho aur log signup karein)</h2>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="genCodeCustom" class="gen-plan-select" placeholder="Apna code (khali = random)" style="width:170px;" autocomplete="off">
+        <select id="genCodePlan" class="gen-plan-select">
+          <option value="basic">Basic ($1)</option>
+          <option value="pro">Pro ($5)</option>
+        </select>
+        <button type="button" class="btn btn-primary btn-small" id="btnGenCode">+ Naya code banao</button>
+      </div>
+    </div>
+    <div class="panel-body" style="max-height:none;">
+      <div id="accessCodeList" class="access-code-list"></div>
+    </div>
+  </div>
+</div><!-- /view-admin -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---- Firebase (cross-device account + data sync) ---- */
+const firebaseConfig = {
+  apiKey: "AIzaSyDnFbY08QOqNXz2X0qBGiY30-ZiwEjA2K8",
+  authDomain: "trade-ledger-99.firebaseapp.com",
+  projectId: "trade-ledger-99",
+  storageBucket: "trade-ledger-99.firebasestorage.app",
+  messagingSenderId: "403536604748",
+  appId: "1:403536604748:web:2a83ec1f470e6ce0df87a9",
+  measurementId: "G-XKYB3B0W8P"
+};
+firebase.initializeApp(firebaseConfig);
+const fsdb = firebase.firestore();
+
+const SESSION_KEY = 'tl_current_user'; // sirf is device pe "already logged in" yaad rakhne ke liye
+let currentUser = null;
+let trades = [];
+let startingBalance = 0;
+let currentResult = null;
+let setups = [];
+let selectedSetup = null;
+
+const DEFAULT_SETUPS = []; // koi preset nahi — user apna khud ka concept "+" se likhega
+
+function userDocId(){ return (currentUser || '').toLowerCase(); }
+const $ = id => document.getElementById(id);
+
+function todayISO(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+function dayName(dateStr){
+  if(!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d)) return '—';
+  return d.toLocaleDateString('en-US', { weekday: 'long' });
+}
+function fmtMoney(n){
+  const num = Number(n) || 0;
+  const sign = num < 0 ? '-' : '';
+  return sign + '$' + Math.abs(num).toFixed(2);
+}
+function animateValue(el, target, formatter){
+  const start = parseFloat(el.dataset.raw || '0') || 0;
+  const end = Number(target) || 0;
+  if(Math.abs(end - start) < 0.005){ el.textContent = formatter(end); el.dataset.raw = end; return; }
+  const duration = 500;
+  const t0 = performance.now();
+  function step(now){
+    const p = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const val = start + (end - start) * eased;
+    el.textContent = formatter(val);
+    if(p < 1) requestAnimationFrame(step);
+    else el.dataset.raw = end;
+  }
+  requestAnimationFrame(step);
+}
+function pairClass(p){
+  if(!p) return '';
+  if(p.toUpperCase().includes('XAU')) return 'xau';
+  if(p.toUpperCase().includes('EUR')) return 'eur';
+  if(p.toUpperCase().includes('BTC')) return 'btc';
+  return '';
+}
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+function journalDoc(){ return fsdb.collection('journals').doc(userDocId()); }
+
+async function loadData(){
+  showToast('Data load ho raha hai…');
+  try{
+    const snap = await journalDoc().get();
+    if(snap.exists){
+      const d = snap.data();
+      startingBalance = typeof d.startingBalance === 'number' ? d.startingBalance : 0;
+      trades = Array.isArray(d.trades) ? d.trades : [];
+      setups = Array.isArray(d.setups) && d.setups.length ? d.setups : [...DEFAULT_SETUPS];
+    } else {
+      startingBalance = 0;
+      trades = [];
+      setups = [...DEFAULT_SETUPS];
+      await journalDoc().set({ startingBalance, trades, setups });
+    }
+  }catch(e){
+    console.error('load failed', e);
+    startingBalance = 0; trades = []; setups = [...DEFAULT_SETUPS];
+    showToast('Data load nahi ho saka — internet check karo');
+  }
+
+  $('startBalance').value = startingBalance || '';
+  selectedSetup = setups[0] || null;
+  renderSetupChips();
+  render();
+}
+
+async function saveTrades(){
+  try{
+    await journalDoc().set({ trades }, { merge: true });
+  }catch(e){ console.error('save failed', e); showToast('Save nahi ho saka — internet check karo'); }
+}
+async function saveStartingBalance(){
+  try{
+    await journalDoc().set({ startingBalance }, { merge: true });
+  }catch(e){ console.error('save failed', e); showToast('Save nahi ho saka — internet check karo'); }
+}
+async function saveSetups(){
+  try{
+    await journalDoc().set({ setups }, { merge: true });
+  }catch(e){ console.error('save failed', e); showToast('Save nahi ho saka — internet check karo'); }
+}
+
+function computeBalances(){
+  let bal = startingBalance;
+  const sorted = [...trades].sort((a,b)=> (a.date||'').localeCompare(b.date||'') || a.ts - b.ts);
+  sorted.forEach(t=>{
+    bal += Number(t.pl) || 0;
+    t.balanceAfter = bal;
+  });
+  return bal;
+}
+
+// Pure version (doesn't touch global state) — used by the admin panel to
+// compute another user's balance without disturbing the logged-in admin's own data.
+function computeBalancesFor(baseBalance, tradeList){
+  let bal = baseBalance;
+  const sorted = [...tradeList].sort((a,b)=> (a.date||'').localeCompare(b.date||'') || a.ts - b.ts)
+    .map(t => ({ ...t }));
+  sorted.forEach(t=>{
+    bal += Number(t.pl) || 0;
+    t.balanceAfter = bal;
+  });
+  return { finalBalance: bal, withBalances: sorted };
+}
+
+function render(){
+  const finalBal = computeBalances();
+  const sorted = [...trades].sort((a,b)=> (b.date||'').localeCompare(a.date||'') || b.ts - a.ts);
+
+  animateValue($('statBalance'), finalBal, fmtMoney);
+  const net = finalBal - startingBalance;
+  const netEl = $('statNet');
+  animateValue(netEl, net, fmtMoney);
+  netEl.className = 'value ' + (net > 0 ? 'pos' : net < 0 ? 'neg' : '');
+
+  const tpCount = trades.filter(t=>t.result==='TP').length;
+  const slCount = trades.filter(t=>t.result==='SL').length;
+  const decisive = tpCount + slCount;
+  $('statWinRate').textContent = decisive ? Math.round((tpCount/decisive)*100) + '%' : '—';
+  $('statWinSub').textContent = `${tpCount} TP · ${slCount} SL`;
+  $('statCount').textContent = trades.length;
+
+  if(trades.length){
+    const best = trades.reduce((a,b)=> (Number(b.pl)||0) > (Number(a.pl)||0) ? b : a);
+    const worst = trades.reduce((a,b)=> (Number(b.pl)||0) < (Number(a.pl)||0) ? b : a);
+    $('statBestWorst').innerHTML = `<span class="pl-pos">${fmtMoney(best.pl)}</span> <span style="color:var(--text-faint)">/</span> <span class="pl-neg">${fmtMoney(worst.pl)}</span>`;
+  } else {
+    $('statBestWorst').textContent = '—';
+  }
+
+  $('subline').textContent = trades.length
+    ? `${trades.length} trade${trades.length>1?'s':''} logged · starting balance ${fmtMoney(startingBalance)}`
+    : 'Apni pehli trade add karo neeche se';
+
+  const tbody = $('tbody');
+  tbody.innerHTML = '';
+  $('emptyState').style.display = sorted.length ? 'none' : 'block';
+
+  sorted.forEach(t=>{
+    const tr = document.createElement('tr');
+    if(t.id === editingId) tr.classList.add('editing-row');
+    tr.innerHTML = `
+      <td class="mono">${t.date || '—'}</td>
+      <td>${dayName(t.date)}</td>
+      <td><span class="pair-tag ${pairClass(t.pair)}">${t.pair || '—'}</span></td>
+      <td class="mono">${t.timeframe || '—'}</td>
+      <td>${t.setup || '—'}</td>
+      <td><span class="badge ${t.result}">${t.result || '—'}</span></td>
+      <td class="${(Number(t.pl)||0) >= 0 ? 'pl-pos' : 'pl-neg'}">${fmtMoney(t.pl)}</td>
+      <td class="bal-cell">${fmtMoney(t.balanceAfter)}</td>
+      <td style="max-width:180px; white-space:normal; color:var(--text-dim); font-size:12.5px;">${t.notes || ''}</td>
+      <td class="row-actions">
+        <button class="row-edit" data-id="${t.id}" title="Edit">✎</button>
+        <button class="row-del" data-id="${t.id}" title="Delete">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.row-del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      trades = trades.filter(t => t.id !== btn.dataset.id);
+      if(editingId === btn.dataset.id) cancelEdit();
+      await saveTrades();
+      render();
+      showToast('Trade delete ho gayi');
+    });
+  });
+
+  tbody.querySelectorAll('.row-edit').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      startEdit(btn.dataset.id);
+    });
+  });
+
+  updateBalPreview();
+}
+
+function updateBalPreview(){
+  const pl = parseFloat($('fPL').value);
+  const projected = computeBalances(); // reflects current saved balance
+  if(!isNaN(pl)){
+    $('fBalPreview').textContent = fmtMoney(projected + pl);
+  } else {
+    $('fBalPreview').textContent = fmtMoney(projected);
+  }
+}
+
+/* ---- setup chips (add / select / delete) ---- */
+function renderSetupChips(){
+  const wrap = $('setupChips');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  setups.forEach(name=>{
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (name === selectedSetup ? ' active' : '');
+    chip.innerHTML = `<span>${name}</span><span class="chip-x" title="Remove">✕</span>`;
+    chip.querySelector('span:first-child').addEventListener('click', ()=>{
+      selectedSetup = name;
+      renderSetupChips();
+    });
+    chip.querySelector('.chip-x').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      setups = setups.filter(s => s !== name);
+      saveSetups();
+      if(selectedSetup === name){ selectedSetup = setups[0] || null; }
+      renderSetupChips();
+    });
+    wrap.appendChild(chip);
+  });
+  const addChip = document.createElement('div');
+  addChip.className = 'chip add-chip';
+  addChip.textContent = '+';
+  addChip.title = 'Naya setup add karo';
+  addChip.addEventListener('click', ()=>{
+    const row = $('setupAddRow');
+    row.classList.toggle('open');
+    if(row.classList.contains('open')){ $('fSetupNew').focus(); }
+  });
+  wrap.appendChild(addChip);
+}
+
+$('btnSaveSetup').addEventListener('click', ()=>{
+  const val = $('fSetupNew').value.trim();
+  if(!val){ showToast('Pehle setup ka naam likho'); return; }
+  const exists = setups.some(s => s.toLowerCase() === val.toLowerCase());
+  if(!exists){
+    setups.push(val);
+    saveSetups();
+  }
+  selectedSetup = val;
+  $('fSetupNew').value = '';
+  $('setupAddRow').classList.remove('open');
+  renderSetupChips();
+  showToast('Setup save ho gaya ✓');
+});
+$('fSetupNew').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); $('btnSaveSetup').click(); }
+});
+
+/* ---- form wiring ---- */
+$('fDate').value = todayISO();
+$('fDay').textContent = dayName($('fDate').value);
+$('fDate').addEventListener('change', ()=>{ $('fDay').textContent = dayName($('fDate').value); });
+
+$('fPair').addEventListener('change', ()=>{
+  $('fPairCustomWrap').style.display = $('fPair').value === '__custom' ? 'flex' : 'none';
+});
+
+document.querySelectorAll('.result-toggle button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.result-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentResult = btn.dataset.r;
+  });
+});
+
+$('fPL').addEventListener('input', updateBalPreview);
+
+$('panelToggle').addEventListener('click', ()=>{
+  $('panel').classList.toggle('open');
+});
+
+$('startBalance').addEventListener('change', async ()=>{
+  startingBalance = parseFloat($('startBalance').value) || 0;
+  await saveStartingBalance();
+  render();
+  showToast('Starting balance update ho gaya');
+});
+
+/* ---- backup: export / import ---- */
+$('btnExportBackup').addEventListener('click', ()=>{
+  const payload = {
+    app: 'trade-ledger-backup',
+    version: 1,
+    user: currentUser,
+    exportedAt: new Date().toISOString(),
+    startingBalance,
+    setups,
+    trades
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = todayISO();
+  a.href = url;
+  a.download = `trade-ledger-${currentUser}-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+  showToast('Backup file download ho gayi ✓');
+});
+
+$('btnImportBackup').addEventListener('click', ()=>{
+  $('fileImportBackup').value = '';
+  $('fileImportBackup').click();
+});
+
+$('fileImportBackup').addEventListener('change', (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    let data;
+    try{
+      data = JSON.parse(reader.result);
+    }catch(err){
+      showToast('Ye file sahi backup nahi lag rahi');
+      return;
+    }
+    if(!data || !Array.isArray(data.trades)){
+      showToast('Ye file sahi backup nahi lag rahi');
+      return;
+    }
+    const ok = confirm(
+      `Ye ${data.trades.length} trade(s) import karega aur is account ("${currentUser}") ka MAUJOODA data replace kar dega. Aage badhein?`
+    );
+    if(!ok) return;
+
+    trades = data.trades;
+    startingBalance = typeof data.startingBalance === 'number' ? data.startingBalance : startingBalance;
+    if(Array.isArray(data.setups) && data.setups.length){ setups = data.setups; }
+
+    await saveTrades();
+    await saveStartingBalance();
+    await saveSetups();
+
+    $('startBalance').value = startingBalance || '';
+    selectedSetup = setups[0] || null;
+    renderSetupChips();
+    render();
+    showToast('Backup import ho gaya ✓');
+  };
+  reader.readAsText(file);
+});
+
+let editingId = null;
+
+function resetForm(){
+  $('fDate').value = todayISO();
+  $('fDay').textContent = dayName($('fDate').value);
+  $('fPair').value = 'XAU/USD';
+  $('fPairCustomWrap').style.display = 'none';
+  $('fPairCustom').value = '';
+  $('fTimeframe').value = '';
+  selectedSetup = setups[0] || null;
+  $('fSetupNew').value = '';
+  $('setupAddRow').classList.remove('open');
+  renderSetupChips();
+  $('fPL').value = '';
+  $('fNotes').value = '';
+  currentResult = null;
+  document.querySelectorAll('.result-toggle button').forEach(b=>b.classList.remove('active'));
+  updateBalPreview();
+  cancelEdit();
+}
+
+function cancelEdit(){
+  editingId = null;
+  $('btnCancelEdit').style.display = 'none';
+  $('btnAdd').textContent = 'Save trade';
+  render();
+}
+
+function startEdit(id){
+  const t = trades.find(x => x.id === id);
+  if(!t) return;
+
+  editingId = id;
+
+  $('fDate').value = t.date || todayISO();
+  $('fDay').textContent = dayName($('fDate').value);
+
+  const knownPairs = ['XAU/USD','EUR/USD','BTC/USD'];
+  if(knownPairs.includes(t.pair)){
+    $('fPair').value = t.pair;
+    $('fPairCustomWrap').style.display = 'none';
+    $('fPairCustom').value = '';
+  } else {
+    $('fPair').value = '__custom';
+    $('fPairCustomWrap').style.display = 'flex';
+    $('fPairCustom').value = t.pair || '';
+  }
+
+  $('fTimeframe').value = t.timeframe || '';
+
+  if(t.setup && !setups.includes(t.setup)){
+    setups.push(t.setup);
+    saveSetups();
+  }
+  selectedSetup = t.setup || setups[0] || null;
+  renderSetupChips();
+
+  currentResult = t.result || null;
+  document.querySelectorAll('.result-toggle button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.r === currentResult);
+  });
+
+  $('fPL').value = t.pl != null ? t.pl : '';
+  $('fNotes').value = t.notes || '';
+  updateBalPreview();
+
+  $('btnCancelEdit').style.display = 'inline-block';
+  $('btnAdd').textContent = 'Update trade';
+
+  $('panel').classList.add('open');
+  $('panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Trade edit ke liye khul gayi — update karke save karo');
+}
+
+$('btnClear').addEventListener('click', resetForm);
+$('btnCancelEdit').addEventListener('click', ()=>{
+  resetForm();
+  showToast('Edit cancel kar diya');
+});
+
+$('btnAdd').addEventListener('click', async ()=>{
+  const pair = $('fPair').value === '__custom' ? $('fPairCustom').value.trim() : $('fPair').value;
+  const setup = selectedSetup;
+  const pl = parseFloat($('fPL').value);
+
+  if(!pair){ showToast('Pair likho pehle, Boss'); return; }
+  if(!setup){ showToast('Ek setup select ya add karo'); return; }
+  if(!currentResult){ showToast('TP / SL / BE select karo'); return; }
+  if(isNaN(pl)){ showToast('Profit ya loss ka number daalo'); return; }
+
+  const date = $('fDate').value || todayISO();
+  const timeframe = $('fTimeframe').value.trim();
+  const notes = $('fNotes').value.trim();
+
+  if(editingId){
+    const idx = trades.findIndex(t => t.id === editingId);
+    if(idx === -1){ showToast('Ye trade ab nahi mili — shayad delete ho chuki hai'); cancelEdit(); return; }
+    trades[idx] = { ...trades[idx], date, pair, timeframe, setup, result: currentResult, pl, notes };
+    await saveTrades();
+    render();
+    resetForm();
+    showToast('Trade update ho gayi ✓');
+  } else {
+    const trade = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      ts: Date.now(),
+      date, pair, timeframe, setup,
+      result: currentResult,
+      pl: pl,
+      notes
+    };
+    trades.push(trade);
+    await saveTrades();
+    render();
+    resetForm();
+    showToast('Trade save ho gayi ✓');
+  }
+
+  const btn = $('btnAdd');
+  btn.classList.remove('saved');
+  void btn.offsetWidth;
+  btn.classList.add('saved');
+  fireConfetti(btn);
+});
+
+function fireConfetti(originEl){
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top;
+  const colors = ['#d4af37','#2fbf71','#5fa8e8','#e05fa0','#9b6ef8','#34e0c8'];
+  for(let i=0;i<26;i++){
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random()*90;
+    p.style.setProperty('--dx', (Math.cos(angle)*dist) + 'px');
+    p.style.setProperty('--dy', (Math.sin(angle)*dist - 40) + 'px');
+    p.style.setProperty('--rot', (Math.random()*360) + 'deg');
+    p.style.left = cx + 'px';
+    p.style.top = cy + 'px';
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    document.body.appendChild(p);
+    setTimeout(()=> p.remove(), 1200);
+  }
+}
+
+function spawnFloatingNumber(){
+  const el = document.createElement('div');
+  const isUp = Math.random() > 0.45;
+  el.className = 'floating-num ' + (isUp ? 'up' : 'down');
+  const samples = isUp
+    ? ['+12.40','+3.8 pips','+0.42%','+64.10','TP hit','+0.9%','+28.00']
+    : ['-8.20','-1.6 pips','-0.31%','-15.50','SL hit','-0.5%','-22.00'];
+  el.textContent = (isUp ? '▲ ' : '▼ ') + samples[Math.floor(Math.random()*samples.length)];
+  el.style.left = (4 + Math.random()*92) + 'vw';
+  el.style.top = (20 + Math.random()*65) + 'vh';
+  document.body.appendChild(el);
+  setTimeout(()=> el.remove(), 6200);
+}
+setInterval(spawnFloatingNumber, 1100);
+for(let i=0;i<4;i++){ setTimeout(spawnFloatingNumber, i*350); }
+
+function buildSparkles(){
+  const wrap = $('sparkleLayer');
+  if(!wrap) return;
+  const colors = ['#d4af37','#2fbf71','#5fa8e8','#e05fa0','#9b6ef8','#34e0c8'];
+  let dots = '';
+  for(let i=0;i<40;i++){
+    const size = 2 + Math.random()*2.5;
+    const left = Math.random()*100;
+    const top = Math.random()*100;
+    const dur = (2.5 + Math.random()*4).toFixed(2);
+    const delay = (Math.random()*5).toFixed(2);
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    dots += `<div class="sparkle" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;background:${color};animation-duration:${dur}s;animation-delay:${delay}s;"></div>`;
+  }
+  wrap.innerHTML = dots;
+}
+
+function runLiveCandles(){
+  const canvas = $('liveCandles');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W, H;
+
+  function resize(){
+    W = canvas.clientWidth;
+    H = canvas.clientHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layout();
+  }
+
+  const candleW = 16;
+  const gap = 9;
+  let candles = [];       // finalized candles, oldest first
+  let price = 0;
+  let baseline = 0;
+  let amplitude = 1;
+  let forming = null;
+  let formTicks = 0;
+  const TICKS_PER_CANDLE = 5;
+  let lastTick = 0;
+  const TICK_MS = 260;
+
+  function layout(){
+    baseline = H * 0.6;
+    amplitude = H * 0.22;
+    const slot = candleW + gap;
+    const count = Math.ceil(W / slot) + 2;
+    if(candles.length === 0){
+      price = baseline;
+      for(let i=0;i<count;i++){
+        const open = price;
+        const close = price + (Math.random()-0.5) * amplitude * 0.5;
+        const high = Math.max(open, close) + Math.random()*amplitude*0.15;
+        const low = Math.min(open, close) - Math.random()*amplitude*0.15;
+        candles.push({open, close, high, low});
+        price = close;
+      }
+      startForming();
+    }
+    while(candles.length > count) candles.shift();
+  }
+
+  function startForming(){
+    const open = price;
+    forming = { open, close: open, high: open, low: open };
+    formTicks = 0;
+  }
+
+  function tickForming(){
+    const step = (Math.random()-0.5) * amplitude * 0.4;
+    let next = forming.close + step;
+    // gentle pull back toward baseline so the chart doesn't wander off-canvas
+    next += (baseline - next) * 0.02;
+    forming.close = next;
+    forming.high = Math.max(forming.high, next);
+    forming.low = Math.min(forming.low, next);
+    formTicks++;
+    if(formTicks >= TICKS_PER_CANDLE){
+      candles.push({ open: forming.open, close: forming.close, high: forming.high, low: forming.low });
+      price = forming.close;
+      if(candles.length > Math.ceil(W/(candleW+gap)) + 2) candles.shift();
+      startForming();
+    }
+  }
+
+  function priceToY(p){
+    return baseline - (p - baseline);
+  }
+
+  function drawGrid(){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    ctx.lineWidth = 1;
+    const rows = 6;
+    for(let i=0;i<=rows;i++){
+      const y = (H/rows) * i;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    drawGrid();
+    const slot = candleW + gap;
+    const totalW = (candles.length + 1) * slot;
+    let x = W - totalW + slot/2;
+
+    const drawOne = (c, isForming)=>{
+      const isUp = c.close >= c.open;
+      const color = isUp ? '#3fe08a' : '#f16a65';
+      const glow = isUp ? 'rgba(47,191,113,0.85)' : 'rgba(229,84,79,0.8)';
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = isForming ? 22 : 13;
+      ctx.lineWidth = 2;
+
+      const yHigh = priceToY(c.high);
+      const yLow = priceToY(c.low);
+      ctx.beginPath();
+      ctx.moveTo(x, yHigh);
+      ctx.lineTo(x, yLow);
+      ctx.stroke();
+
+      const yOpen = priceToY(c.open);
+      const yClose = priceToY(c.close);
+      const top = Math.min(yOpen, yClose);
+      const bh = Math.max(Math.abs(yClose - yOpen), 2.5);
+      ctx.fillRect(x - candleW/2, top, candleW, bh);
+      ctx.strokeRect(x - candleW/2, top, candleW, bh);
+    };
+
+    candles.forEach(c=>{ drawOne(c, false); x += slot; });
+    if(forming) drawOne(forming, true);
+  }
+
+  function frame(now){
+    if(now - lastTick > TICK_MS){
+      lastTick = now;
+      tickForming();
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(frame);
+}
+
+function buildCandles(){
+  const wrap = $('candles');
+  if(!wrap) return;
+  const heights = [22,38,26,50,34,60,28,44,52,30,46,36];
+  wrap.innerHTML = heights.map((h,i)=>{
+    const isGreen = Math.random() > 0.42;
+    const delay = (i * 0.05).toFixed(2);
+    const flickerDelay = (Math.random()*3).toFixed(2);
+    const bobDelay = (i * 0.12).toFixed(2);
+    return `<div class="candle ${isGreen?'g':'r'}" style="height:${h}px; animation-delay:${delay}s, ${flickerDelay}s, ${bobDelay}s;"></div>`;
+  }).join('');
+}
+
+function buildTicker(){
+  const track = $('tickerTrack');
+  if(!track) return;
+  const base = [
+    {p:'XAU/USD', v:(4300+Math.random()*120).toFixed(2), dir: Math.random()>0.5},
+    {p:'EUR/USD', v:(1.05+Math.random()*0.03).toFixed(4), dir: Math.random()>0.5},
+    {p:'BTC/USD', v:(80000+Math.random()*3000).toFixed(0), dir: Math.random()>0.5},
+    {p:'XAU/USD', v:'50/70% zone', dir: null},
+    {p:'EUR/USD', v:'London session', dir: null},
+    {p:'BTC/USD', v:'BOS confirmed', dir: null},
+  ];
+  const item = (t)=> `<span>${t.p} <span class="${t.dir===true?'up':t.dir===false?'down':''}">${t.dir===true?'▲':t.dir===false?'▼':'·'} ${t.v}</span></span>`;
+  const html = base.map(item).join('');
+  track.innerHTML = html + html; // duplicate for seamless loop
+}
+
+/* ---- auth: sign up / log in (Firestore-backed, works from any device) ---- */
+function usersCol(){ return fsdb.collection('users'); }
+
+async function findUser(name){
+  const doc = await usersCol().doc(name.toLowerCase()).get();
+  return doc.exists ? doc.data() : null;
+}
+async function createUser(name, code, plan){
+  await usersCol().doc(name.toLowerCase()).set({ name, code, plan: plan || 'basic' });
+}
+
+let currentPlan = 'basic';
+function isProUser(){
+  return currentPlan === 'pro' || (currentUser || '').toLowerCase() === ADMIN_NAME;
+}
+
+/* ---- access codes (sellable invite codes — admin generates, buyer redeems at signup) ---- */
+function accessCodesCol(){ return fsdb.collection('accessCodes'); }
+
+async function consumeAccessCode(code, byName){
+  const ref = accessCodesCol().doc(code);
+  try{
+    return await fsdb.runTransaction(async (tx)=>{
+      const snap = await tx.get(ref);
+      if(!snap.exists) return null;
+      const data = snap.data();
+      if(data.used) return null;
+      tx.update(ref, { used: true, usedBy: byName, usedAt: new Date().toISOString() });
+      return data.plan === 'pro' ? 'pro' : 'basic';
+    });
+  }catch(e){
+    console.error('consume code failed', e);
+    return null;
+  }
+}
+
+function randomAccessCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I confusion
+  let out = '';
+  for(let i=0;i<8;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  return out.slice(0,4) + '-' + out.slice(4);
+}
+
+let authMode = 'login';
+document.querySelectorAll('.auth-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    authMode = tab.dataset.mode;
+    $('authCodeConfirmWrap').style.display = authMode === 'signup' ? 'flex' : 'none';
+    $('accessCodeWrap').style.display = authMode === 'signup' ? 'flex' : 'none';
+    $('authSub').textContent = authMode === 'signup'
+      ? 'Naya account banao — apna naam aur ek code chuno'
+      : 'Apna naam aur code daal ke journal kholo';
+    $('authSubmit').textContent = authMode === 'signup' ? 'Sign up' : 'Log in';
+    $('authError').textContent = '';
+    refreshCaptcha();
+  });
+});
+
+/* ---- password show/hide ---- */
+document.querySelectorAll('.pw-eye').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const input = $(btn.dataset.target);
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.classList.toggle('showing', !showing);
+  });
+});
+
+/* ---- simple math captcha ("robot" verification) ---- */
+let captchaExpected = 0;
+function refreshCaptcha(){
+  const a = Math.floor(Math.random()*8) + 2;
+  const b = Math.floor(Math.random()*8) + 2;
+  captchaExpected = a + b;
+  $('captchaQ').textContent = `${a} + ${b} =`;
+  $('captchaAnswer').value = '';
+}
+$('captchaRefresh').addEventListener('click', refreshCaptcha);
+refreshCaptcha();
+
+async function submitAuth(){
+  const name = $('authName').value.trim();
+  const code = $('authCode').value.trim();
+  const errEl = $('authError');
+  const submitBtn = $('authSubmit');
+  errEl.textContent = '';
+  if(!name){ errEl.textContent = 'Naam likho'; return; }
+  if(!code){ errEl.textContent = 'Code likho'; return; }
+
+  const captchaVal = parseInt($('captchaAnswer').value.trim(), 10);
+  if(isNaN(captchaVal) || captchaVal !== captchaExpected){
+    errEl.textContent = 'Verification ka jawab ghalat hai';
+    refreshCaptcha();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  const originalLabel = submitBtn.textContent;
+  submitBtn.textContent = 'Ek second…';
+
+  try{
+    if(authMode === 'signup'){
+      const confirm = $('authCodeConfirm').value.trim();
+      if(code !== confirm){ errEl.textContent = 'Code match nahi ho raha'; refreshCaptcha(); return; }
+      const existing = await findUser(name);
+      if(existing){ errEl.textContent = 'Ye naam pehle se registered hai — Log in try karo'; refreshCaptcha(); return; }
+
+      const accessCode = $('accessCodeInput').value.trim().toUpperCase();
+      if(!accessCode){ errEl.textContent = 'Access code likho — ye account owner se milega'; refreshCaptcha(); return; }
+      const grantedPlan = await consumeAccessCode(accessCode, name);
+      if(!grantedPlan){ errEl.textContent = 'Access code galat hai ya already use ho chuka hai'; refreshCaptcha(); return; }
+
+      await createUser(name, code, grantedPlan);
+      await loginAs(name);
+    } else {
+      const user = await findUser(name);
+      if(!user || user.code !== code){ errEl.textContent = 'Naam ya code ghalat hai'; refreshCaptcha(); return; }
+      await loginAs(user.name);
+    }
+  }catch(e){
+    console.error('auth failed', e);
+    errEl.textContent = 'Connect nahi ho saka — internet check karo';
+    refreshCaptcha();
+  }finally{
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
+  }
+}
+$('authSubmit').addEventListener('click', submitAuth);
+['authName','authCode','authCodeConfirm','captchaAnswer'].forEach(id=>{
+  $(id).addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); submitAuth(); } });
+});
+
+async function loginAs(name){
+  currentUser = name;
+  try{ localStorage.setItem(SESSION_KEY, name); }catch(e){}
+  $('currentUserLabel').textContent = name;
+  $('authOverlay').classList.add('hidden');
+  $('authName').value = '';
+  $('authCode').value = '';
+  $('authCodeConfirm').value = '';
+
+  try{
+    const u = await findUser(name);
+    currentPlan = (u && u.plan === 'pro') ? 'pro' : 'basic';
+  }catch(e){ currentPlan = 'basic'; }
+  tvChartInitialized = false;
+  $('tvChartContainer').innerHTML = '';
+  $('ciCode').value = '';
+  updatePlanBadge();
+
+  const isAdmin = name.toLowerCase() === ADMIN_NAME;
+  const adminTabBtn = document.querySelector('.tab-btn[data-tab="admin"]');
+  if(adminTabBtn) adminTabBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  document.body.classList.toggle('admin-mode', isAdmin);
+  $('adminCrown').style.display = isAdmin ? 'inline' : 'none';
+  $('userBadge').classList.toggle('admin-user-badge', isAdmin);
+  switchTab('journal');
+
+  await loadData();
+}
+
+$('btnLogout').addEventListener('click', ()=>{
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  currentUser = null;
+  trades = [];
+  startingBalance = 0;
+  setups = [];
+  document.body.classList.remove('admin-mode');
+  $('adminCrown').style.display = 'none';
+  $('userBadge').classList.remove('admin-user-badge');
+  const adminTabBtn = document.querySelector('.tab-btn[data-tab="admin"]');
+  if(adminTabBtn) adminTabBtn.style.display = 'none';
+  $('authOverlay').classList.remove('hidden');
+});
+
+/* ---- admin account (auto-created once, then behaves like a normal login) ---- */
+const ADMIN_NAME = 'admin';
+const ADMIN_CODE = '94549144#5Aaatifhussain786';
+
+async function ensureAdminAccount(){
+  try{
+    const existing = await findUser(ADMIN_NAME);
+    if(!existing){
+      await createUser(ADMIN_NAME, ADMIN_CODE);
+    }
+  }catch(e){ console.error('admin seed failed', e); }
+}
+
+/* ---- Goal Planner: split a profit target across N upcoming trades ---- */
+$('btnCalcGoal').addEventListener('click', ()=>{
+  const resultEl = $('goalResult');
+  const balance = parseFloat($('gBalance').value);
+  const target = parseFloat($('gTarget').value);
+  const numTrades = parseInt($('gTrades').value, 10);
+  const rr = parseFloat($('gRR').value);
+
+  if(isNaN(balance) || balance <= 0){ resultEl.innerHTML = '<div class="goal-error">Current balance likho</div>'; return; }
+  if(isNaN(target) || target <= 0){ resultEl.innerHTML = '<div class="goal-error">Target profit likho</div>'; return; }
+  if(isNaN(numTrades) || numTrades < 1){ resultEl.innerHTML = '<div class="goal-error">Kitne trades mein — number likho</div>'; return; }
+
+  const perTradeProfit = target / numTrades;
+  const slPerTrade = perTradeProfit / rr;
+
+  let rows = '';
+  let runningBalance = balance;
+  for(let i = 1; i <= numTrades; i++){
+    runningBalance += perTradeProfit;
+    rows += `
+      <div class="goal-row">
+        <div class="goal-row-num">Trade ${i}</div>
+        <div class="goal-row-item"><span>Stop Loss</span><strong class="pl-neg">-${fmtMoney(slPerTrade).replace('-','')}</strong></div>
+        <div class="goal-row-item"><span>Take Profit</span><strong class="pl-pos">+${fmtMoney(perTradeProfit).replace('-','')}</strong></div>
+        <div class="goal-row-item"><span>Balance is trade ke TP lagne par</span><strong class="mono">${fmtMoney(runningBalance)}</strong></div>
+      </div>`;
+  }
+
+  resultEl.innerHTML = `
+    <div class="goal-summary">
+      Agar in ${numTrades} trades mein se har ek apna TP hit kare (1:${rr} RR ke saath), to balance
+      <strong class="gold-text">${fmtMoney(balance)}</strong> se badh kar
+      <strong class="gold-text">${fmtMoney(balance + target)}</strong> ho jayega.
+    </div>
+    <div class="goal-rows">${rows}</div>
+    <div class="goal-note">Note: ye sirf ek suggestion hai — apna trading framework (session, confirmation candle, news check) hamesha follow karo. Agar koi trade SL lage to target thoda aage khisak jayega, poora plan reset karke dobara calculate kar lena.</div>
+  `;
+});
+
+/* ---- tab switching (Journal / Goal Planner / All Users) ---- */
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab === tab));
+  $('view-journal').style.display = tab === 'journal' ? '' : 'none';
+  $('view-chart').style.display = tab === 'chart' ? '' : 'none';
+  $('view-goal').style.display = tab === 'goal' ? '' : 'none';
+  $('view-admin').style.display = tab === 'admin' ? '' : 'none';
+  if(tab === 'admin') loadAdminPanel();
+  if(tab === 'chart'){
+    const pro = isProUser();
+    $('chartLocked').style.display = pro ? 'none' : 'block';
+    if(!pro) refreshBuyBox();
+    $('chartPro').style.display = pro ? 'block' : 'none';
+    if(pro){ initTVChart(); initCI(); }
+  }
+}
+
+function updatePlanBadge(){
+  const chip = $('planChip');
+  if(!chip) return;
+  const pro = isProUser();
+  chip.textContent = pro ? 'PRO' : 'BASIC';
+  chip.className = 'plan-chip ' + (pro ? 'pro' : 'basic');
+  $('btnUpgradeTop').style.display = pro ? 'none' : 'inline-block';
+}
+$('btnUpgradeTop').addEventListener('click', ()=> switchTab('chart'));
+
+
+/* ---- Custom indicator (Pro): user JS code on Binance candles via lightweight-charts ---- */
+const CI_DEFAULT = `// candles: [{time, open, high, low, close, volume}]
+// helpers: sma(values, n), ema(values, n), rsi(values, n)
+const closes = candles.map(c => c.close);
+return {
+  'EMA 20': ema(closes, 20),
+  'EMA 50': ema(closes, 50)
+};`;
+function ciKey(){ return 'tl_ci_' + (currentUser || '').toLowerCase(); }
+function initCI(){
+  const ta = $('ciCode');
+  if(!ta.value.trim()){
+    let saved = null; try{ saved = localStorage.getItem(ciKey()); }catch(e){}
+    ta.value = saved || PINE_DEFAULT;
+  }
+}
+const PINE_DEFAULT = `//@version=5
+indicator("RSI + EMA", overlay=false)
+r = ta.rsi(close, 14)
+plot(r, "RSI", color=color.purple)
+plot(ta.ema(r, 9), "RSI EMA", color=color.orange)
+hline(70)
+hline(30)`;
+$('btnResetIndicator').addEventListener('click', ()=>{ $('ciCode').value = CI_DEFAULT; });
+$('btnPineExample').addEventListener('click', ()=>{ $('ciCode').value = PINE_DEFAULT; });
+
+let pinePromise = null;
+function loadPine(){
+  if(typeof PineTSLib !== 'undefined' && PineTSLib.PineTS) return Promise.resolve();
+  if(pinePromise) return pinePromise;
+  pinePromise = new Promise((resolve, reject)=>{
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/pinets@0.11.0/dist/pinets.min.browser.js';
+    sc.onload = ()=> (typeof PineTSLib !== 'undefined' && PineTSLib.PineTS) ? resolve() : reject(new Error('Pine engine load nahi hua'));
+    sc.onerror = ()=>{ pinePromise = null; reject(new Error('Pine engine download nahi ho saka — internet check karo')); };
+    document.head.appendChild(sc);
+  });
+  return pinePromise;
+}
+function looksLikePine(code){
+  return /\/\/\s*@version\s*=/.test(code) || /(^|\n)\s*(indicator|strategy)\s*\(/.test(code);
+}
+
+function ciSma(v, n){
+  const out = []; let sum = 0;
+  for(let i=0;i<v.length;i++){
+    sum += v[i];
+    if(i >= n) sum -= v[i-n];
+    out.push(i >= n-1 ? sum/n : null);
+  }
+  return out;
+}
+function ciEma(v, n){
+  const out = []; const k = 2/(n+1); let prev = null;
+  for(let i=0;i<v.length;i++){
+    if(i < n-1){ out.push(null); continue; }
+    if(prev === null){ prev = v.slice(0,n).reduce((a,b)=>a+b,0)/n; }
+    else prev = v[i]*k + prev*(1-k);
+    out.push(prev);
+  }
+  return out;
+}
+function ciRsi(v, n){
+  const out = new Array(v.length).fill(null);
+  if(v.length <= n) return out;
+  let g = 0, l = 0;
+  for(let i=1;i<=n;i++){ const d = v[i]-v[i-1]; if(d>=0) g+=d; else l-=d; }
+  g/=n; l/=n;
+  out[n] = l===0 ? 100 : 100 - 100/(1+g/l);
+  for(let i=n+1;i<v.length;i++){
+    const d = v[i]-v[i-1];
+    g = (g*(n-1) + (d>0?d:0))/n;
+    l = (l*(n-1) + (d<0?-d:0))/n;
+    out[i] = l===0 ? 100 : 100 - 100/(1+g/l);
+  }
+  return out;
+}
+
+async function ciFetch(symbol, interval){
+  const q = `symbol=${symbol}&interval=${interval}&limit=500`;
+  const urls = [`https://api.binance.com/api/v3/klines?${q}`, `https://data-api.binance.vision/api/v3/klines?${q}`];
+  for(const u of urls){
+    try{
+      const r = await fetch(u);
+      if(!r.ok) continue;
+      const j = await r.json();
+      return j.map(k=>({ time: Math.floor(k[0]/1000), open:+k[1], high:+k[2], low:+k[3], close:+k[4], volume:+k[5] }));
+    }catch(e){}
+  }
+  throw new Error('Market data load nahi ho saka — internet check karo');
+}
+
+let ciMain = null, ciPaneChart = null;
+const CI_COLORS = ['#d4af37','#5fa8e8','#e05fa0','#34e0c8','#9b6ef8','#f59e0b'];
+function ciOpts(h){
+  return {
+    height: h,
+    layout: { background: { color: '#080c12' }, textColor: '#8a99ab' },
+    grid: { vertLines: { color: 'rgba(255,255,255,0.04)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
+    rightPriceScale: { borderColor: '#23303f' },
+    timeScale: { borderColor: '#23303f', timeVisible: true }
+  };
+}
+
+$('btnRunIndicator').addEventListener('click', async ()=>{
+  const status = $('ciStatus');
+  const code = $('ciCode').value;
+  status.className = 'ci-status';
+  status.textContent = 'Data load ho raha hai…';
+  try{ localStorage.setItem(ciKey(), code); }catch(e){}
+
+  let candles;
+  try{ candles = await ciFetch($('ciSymbol').value, $('ciInterval').value); }
+  catch(e){ status.className = 'ci-status err'; status.textContent = e.message; return; }
+
+  let lines = [];          // [{ name, color, data:[{time(sec), value}] }]
+  let usePane = $('ciPane').checked;
+
+  if(looksLikePine(code)){
+    status.textContent = 'Pine engine load ho raha hai…';
+    try{ await loadPine(); }
+    catch(e){ status.className = 'ci-status err'; status.textContent = e.message; return; }
+    status.textContent = 'Pine script chal rahi hai…';
+    try{
+      const feed = candles.map(c=>({ open:c.open, high:c.high, low:c.low, close:c.close, volume:c.volume, openTime:c.time*1000, closeTime:c.time*1000+1 }));
+      const pine = new PineTSLib.PineTS(feed, $('ciSymbol').value, $('ciInterval').value);
+      const { plots } = await pine.run(code);
+      const m = code.match(/indicator\s*\([^)]*overlay\s*=\s*(true|false)/);
+      if(m) usePane = (m[1] === 'false');
+      let idx = 0;
+      for(const [name, series] of Object.entries(plots || {})){
+        if(name.startsWith('__') || !series || !Array.isArray(series.data)) continue;
+        const data = [];
+        let color = null;
+        for(const d of series.data){
+          if(typeof d.value === 'number' && isFinite(d.value)){
+            data.push({ time: Math.floor(d.time/1000), value: d.value });
+            if(!color && d.options && d.options.color) color = d.options.color;
+          }
+        }
+        if(!data.length) continue;
+        lines.push({ name, color: color || CI_COLORS[idx % CI_COLORS.length], data });
+        idx++;
+      }
+    }catch(e){
+      status.className = 'ci-status err';
+      status.textContent = 'Pine script mein error: ' + (e.message || e);
+      return;
+    }
+  } else {
+    let result;
+    try{
+      const fn = new Function('candles','sma','ema','rsi', code);
+      result = fn(candles, ciSma, ciEma, ciRsi);
+    }catch(e){
+      status.className = 'ci-status err';
+      status.textContent = 'Code mein error: ' + e.message;
+      return;
+    }
+    if(Array.isArray(result)) result = { 'Indicator': result };
+    if(!result || typeof result !== 'object'){
+      status.className = 'ci-status err';
+      status.textContent = 'Code ko array ya { naam: array } return karna chahiye';
+      return;
+    }
+    let idx = 0;
+    for(const [name, arr] of Object.entries(result)){
+      if(!Array.isArray(arr)) continue;
+      const data = [];
+      for(let i=0;i<arr.length && i<candles.length;i++){
+        const v = arr[i];
+        if(typeof v === 'number' && isFinite(v)) data.push({ time: candles[i].time, value: v });
+      }
+      lines.push({ name, color: CI_COLORS[idx % CI_COLORS.length], data });
+      idx++;
+    }
+  }
+
+  $('ciPane').checked = usePane;
+  $('ciPaneBox').style.display = usePane ? 'block' : 'none';
+  if(ciMain){ ciMain.remove(); ciMain = null; }
+  if(ciPaneChart){ ciPaneChart.remove(); ciPaneChart = null; }
+  $('ciChartBox').innerHTML = ''; $('ciPaneBox').innerHTML = '';
+
+  ciMain = LightweightCharts.createChart($('ciChartBox'), ciOpts(420));
+  const cs = ciMain.addCandlestickSeries({
+    upColor:'#2fbf71', downColor:'#e5544f', borderVisible:false, wickUpColor:'#2fbf71', wickDownColor:'#e5544f'
+  });
+  cs.setData(candles.map(c=>({ time:c.time, open:c.open, high:c.high, low:c.low, close:c.close })));
+
+  if(usePane){
+    ciPaneChart = LightweightCharts.createChart($('ciPaneBox'), ciOpts(170));
+    ciMain.timeScale().subscribeVisibleLogicalRangeChange(r=>{ if(r && ciPaneChart) ciPaneChart.timeScale().setVisibleLogicalRange(r); });
+  }
+  const target = usePane ? ciPaneChart : ciMain;
+  lines.forEach(l=>{
+    const ls = target.addLineSeries({ color: l.color, lineWidth: 2, title: l.name });
+    ls.setData(l.data);
+  });
+  ciMain.timeScale().fitContent();
+  status.textContent = lines.length ? `✓ ${lines.length} indicator line(s) chart par lag gayi (${candles.length} candles)` : 'Koi valid line nahi mili — plot()/return check karo';
+});
+
+/* ---- buy / upgrade request ---- */
+const OWNER_WHATSAPP = '923348024647';
+function refreshBuyBox(){
+  $('buyUserName').textContent = currentUser || '—';
+  const plan = $('reqPlan').value === 'basic' ? 'Basic ($1)' : 'Pro ($5)';
+  const msg = `Assalam o Alaikum, mujhe Trade Ledger ka ${plan} plan chahiye. Mera account naam: ${currentUser}`;
+  $('btnWhatsApp').href = `https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+}
+$('reqPlan').addEventListener('change', refreshBuyBox);
+
+$('btnSendRequest').addEventListener('click', async ()=>{
+  const btn = $('btnSendRequest');
+  btn.disabled = true;
+  try{
+    await fsdb.collection('upgradeRequests').add({
+      name: currentUser,
+      plan: $('reqPlan').value === 'basic' ? 'basic' : 'pro',
+      note: $('reqNote').value.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    });
+    $('reqNote').value = '';
+    $('reqStatus').textContent = '✓ Request bhej di gayi — payment karke owner ko 03348024647 par apna naam bhejo, wo plan activate kar dega.';
+  }catch(e){
+    console.error('request failed', e);
+    $('reqStatus').textContent = '';
+    showToast('Request nahi ja saki — internet check karo');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+/* ---- admin: upgrade requests ---- */
+async function loadUpgradeRequests(){
+  const listEl = $('requestList');
+  if(!listEl) return;
+  listEl.innerHTML = '<div class="admin-loading">Requests load ho rahi hain…</div>';
+  try{
+    const snap = await fsdb.collection('upgradeRequests').orderBy('createdAt', 'desc').get();
+    const pending = snap.docs.filter(d => d.data().status === 'pending');
+    if(!pending.length){
+      listEl.innerHTML = '<div class="admin-loading">Koi pending request nahi</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    pending.forEach(doc=>{
+      const d = doc.data();
+      const row = document.createElement('div');
+      row.className = 'access-code-row';
+      row.innerHTML = `
+        <span><strong>${d.name}</strong> <span class="plan-chip ${d.plan}">${d.plan.toUpperCase()}</span>
+          <span style="color:var(--text-faint); font-size:11.5px; margin-left:8px;">${d.note || ''}</span></span>
+        <span style="display:flex; gap:6px;">
+          <button type="button" class="plan-toggle-btn req-approve">✓ Approve</button>
+          <button type="button" class="plan-toggle-btn req-dismiss">✕ Dismiss</button>
+        </span>`;
+      row.querySelector('.req-approve').addEventListener('click', async ()=>{
+        try{
+          await usersCol().doc(d.name.toLowerCase()).set({ plan: d.plan }, { merge: true });
+          await doc.ref.update({ status: 'approved' });
+          showToast(d.name + ' ka plan ' + d.plan.toUpperCase() + ' ho gaya ✓');
+          loadAdminPanel();
+        }catch(e){ showToast('Approve nahi ho saka'); }
+      });
+      row.querySelector('.req-dismiss').addEventListener('click', async ()=>{
+        try{ await doc.ref.update({ status: 'dismissed' }); loadUpgradeRequests(); }
+        catch(e){ showToast('Dismiss nahi ho saka'); }
+      });
+      listEl.appendChild(row);
+    });
+  }catch(e){
+    console.error('requests load failed', e);
+    listEl.innerHTML = '<div class="admin-loading">Load nahi ho saka — rules check karo</div>';
+  }
+}
+
+/* ---- Risk / lot-size calculator (Pro) ---- */
+$('btnCalcRisk').addEventListener('click', ()=>{
+  const bal = parseFloat($('rcBalance').value);
+  const riskPct = parseFloat($('rcRisk').value);
+  const sl = parseFloat($('rcSL').value);
+  const pair = $('rcPair').value;
+  const out = $('riskResult');
+
+  if(isNaN(bal) || bal <= 0 || isNaN(riskPct) || riskPct <= 0 || isNaN(sl) || sl <= 0){
+    out.innerHTML = '<div class="goal-error">Balance, risk % aur stop loss teeno sahi number mein likho</div>';
+    return;
+  }
+
+  const riskUsd = bal * (riskPct / 100);
+  // approx $ per pip per 1.00 lot: XAU/USD = $10 per 1.0 move-pip(0.1), EUR/USD = $10 per pip
+  const pipValuePerLot = 10;
+  let lots = riskUsd / (sl * pipValuePerLot);
+  lots = Math.max(0.01, Math.floor(lots * 100) / 100);
+  const actualRisk = lots * sl * pipValuePerLot;
+
+  out.innerHTML = `
+    <div class="risk-grid">
+      <div class="risk-cell"><span>Risk amount</span><strong>${fmtMoney(riskUsd)}</strong></div>
+      <div class="risk-cell"><span>Suggested lot size</span><strong>${lots.toFixed(2)}</strong></div>
+      <div class="risk-cell"><span>Actual risk (is lot par)</span><strong>${fmtMoney(actualRisk)}</strong></div>
+    </div>
+    <div class="goal-note">Note: ${pair} ke liye approx calculation hai (1 pip ≈ $10 per 1.00 lot). Apne broker ki exact pip value zaroor check karo. Minimum lot 0.01 hai — agar risk bahut kam ho to wo bhi 0.01 hi dikhega.</div>
+  `;
+});
+
+/* ---- TradingView advanced chart (lazy-loaded the first time the tab opens) ---- */
+let tvChartInitialized = false;
+function initTVChart(){
+  if(tvChartInitialized) return;
+  if(typeof TradingView === 'undefined'){
+    setTimeout(initTVChart, 300); // tv.js abhi load ho raha hoga, thodi der baad try karo
+    return;
+  }
+  tvChartInitialized = true;
+  new TradingView.widget({
+    autosize: true,
+    symbol: 'OANDA:XAUUSD',
+    interval: '15',
+    timezone: 'Etc/UTC',
+    theme: 'dark',
+    style: '1',
+    locale: 'en',
+    toolbar_bg: '#0e141e',
+    enable_publishing: false,
+    allow_symbol_change: true,
+    hide_side_toolbar: false,
+    withdateranges: true,
+    details: true,
+    container_id: 'tvChartContainer'
+  });
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchTab(btn.dataset.tab));
+});
+
+/* ---- admin: view every user's journal ---- */
+async function loadAdminPanel(){
+  const listEl = $('adminUserList');
+  listEl.innerHTML = '<div class="admin-loading">Users load ho rahe hain…</div>';
+  $('adminDetailWrap').style.display = 'none';
+  loadAccessCodes();
+  loadUpgradeRequests();
+
+  let usersSnap;
+  try{
+    usersSnap = await usersCol().get();
+  }catch(e){
+    console.error('admin user list failed', e);
+    listEl.innerHTML = '<div class="admin-loading">Load nahi ho saka — internet check karo</div>';
+    return;
+  }
+
+  const users = usersSnap.docs.map(d => d.data());
+  if(!users.length){
+    listEl.innerHTML = '<div class="admin-loading">Koi registered user nahi mila</div>';
+    return;
+  }
+
+  // fetch each user's journal in parallel
+  const rows = await Promise.all(users.map(async (u)=>{
+    let journal = null;
+    try{
+      const snap = await fsdb.collection('journals').doc(u.name.toLowerCase()).get();
+      journal = snap.exists ? snap.data() : { startingBalance: 0, trades: [] };
+    }catch(e){
+      journal = { startingBalance: 0, trades: [] };
+    }
+    const { finalBalance } = computeBalancesFor(journal.startingBalance || 0, journal.trades || []);
+    return { name: u.name, plan: u.plan === 'pro' ? 'pro' : 'basic', tradeCount: (journal.trades || []).length, balance: finalBalance };
+  }));
+
+  rows.sort((a,b)=> a.name.localeCompare(b.name));
+
+  listEl.innerHTML = '';
+  rows.forEach(r=>{
+    const row = document.createElement('div');
+    row.className = 'admin-user-row';
+    const isYou = r.name.toLowerCase() === currentUser.toLowerCase();
+    const isAdminRow = r.name.toLowerCase() === ADMIN_NAME;
+    row.innerHTML = `
+      <div class="admin-user-name">${r.name}${isYou ? '<span class="you-tag">(aap)</span>' : ''}<span class="plan-chip ${isAdminRow ? 'pro' : r.plan}">${isAdminRow ? 'ADMIN' : r.plan.toUpperCase()}</span></div>
+      <div class="admin-user-meta">
+        <span>${r.tradeCount} trade${r.tradeCount === 1 ? '' : 's'}</span>
+        <span class="${r.balance >= 0 ? 'bal-pos' : 'bal-neg'}">${fmtMoney(r.balance)}</span>
+        ${isAdminRow ? '' : `<button type="button" class="plan-toggle-btn" data-name="${r.name}" data-plan="${r.plan}">${r.plan === 'pro' ? 'Downgrade → Basic' : 'Upgrade → Pro'}</button>`}
+      </div>
+    `;
+    row.addEventListener('click', ()=> openAdminUserDetail(r.name));
+    const tbtn = row.querySelector('.plan-toggle-btn');
+    if(tbtn){
+      tbtn.addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        const newPlan = tbtn.dataset.plan === 'pro' ? 'basic' : 'pro';
+        try{
+          await usersCol().doc(tbtn.dataset.name.toLowerCase()).set({ plan: newPlan }, { merge: true });
+          showToast(tbtn.dataset.name + ' ka plan ' + newPlan.toUpperCase() + ' ho gaya ✓');
+          loadAdminPanel();
+        }catch(err){
+          console.error('plan change failed', err);
+          showToast('Plan change nahi ho saka — internet check karo');
+        }
+      });
+    }
+    listEl.appendChild(row);
+  });
+}
+
+async function openAdminUserDetail(name){
+  document.querySelectorAll('.admin-user-row').forEach(row=>{
+    row.classList.toggle('active-row', row.querySelector('.admin-user-name').textContent.trim().startsWith(name));
+  });
+
+  const wrap = $('adminDetailWrap');
+  const head = $('adminDetailHead');
+  const body = $('adminDetailBody');
+  wrap.style.display = 'block';
+  head.innerHTML = `Loading <strong>${name}</strong>'s journal…`;
+  body.innerHTML = '';
+
+  let journal;
+  try{
+    const snap = await fsdb.collection('journals').doc(name.toLowerCase()).get();
+    journal = snap.exists ? snap.data() : { startingBalance: 0, trades: [], setups: [] };
+  }catch(e){
+    head.innerHTML = 'Load nahi ho saka — internet check karo';
+    return;
+  }
+
+  const { finalBalance, withBalances } = computeBalancesFor(journal.startingBalance || 0, journal.trades || []);
+  const sorted = withBalances.sort((a,b)=> (b.date||'').localeCompare(a.date||'') || (b.ts||0) - (a.ts||0));
+
+  head.innerHTML = `Viewing <strong>${name}</strong> — balance: <strong>${fmtMoney(finalBalance)}</strong> — ${sorted.length} trade${sorted.length===1?'':'s'}`;
+
+  if(!sorted.length){
+    body.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-faint); padding:20px;">Is user ki abhi koi trade nahi hai</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = sorted.map(t => `
+    <tr>
+      <td class="mono">${t.date || '—'}</td>
+      <td>${dayName(t.date)}</td>
+      <td><span class="pair-tag ${pairClass(t.pair)}">${t.pair || '—'}</span></td>
+      <td class="mono">${t.timeframe || '—'}</td>
+      <td>${t.setup || '—'}</td>
+      <td><span class="badge ${t.result}">${t.result || '—'}</span></td>
+      <td class="${(Number(t.pl)||0) >= 0 ? 'pl-pos' : 'pl-neg'}">${fmtMoney(t.pl)}</td>
+      <td class="bal-cell">${fmtMoney(t.balanceAfter)}</td>
+      <td style="max-width:180px; white-space:normal; color:var(--text-dim); font-size:12.5px;">${t.notes || ''}</td>
+    </tr>
+  `).join('');
+}
+
+async function initAuth(){
+  let saved = null;
+  try{ saved = localStorage.getItem(SESSION_KEY); }catch(e){}
+  if(saved){
+    try{
+      const user = await findUser(saved);
+      if(user){ await loginAs(user.name); return; }
+    }catch(e){ console.error('session check failed', e); }
+  }
+  $('authOverlay').classList.remove('hidden');
+}
+
+function buildDataColumns(){
+  const cols = [
+    {track: $('dataColLeftTrack'), dur: 22},
+    {track: $('dataColRightTrack'), dur: 28}
+  ];
+  cols.forEach(col=>{
+    if(!col.track) return;
+    let rows = '';
+    for(let i=0;i<40;i++){
+      const isUp = Math.random() > 0.45;
+      const val = (Math.random()*400 + 10).toFixed(2);
+      const pct = ((Math.random()*2 - (isUp?0:2)).toFixed(2));
+      const color = isUp ? 'var(--green)' : 'var(--red)';
+      rows += `<span style="color:${color}">${isUp?'▲':'▼'} ${val}</span>`;
+    }
+    col.track.innerHTML = rows + rows;
+    col.track.style.animationDuration = col.dur + 's';
+  });
+}
+
+buildCandles();
+buildDataColumns();
+buildSparkles();
+runLiveCandles();
+buildTicker();
+/* ---- admin: generate & list access codes ---- */
+async function loadAccessCodes(){
+  const listEl = $('accessCodeList');
+  if(!listEl) return;
+  listEl.innerHTML = '<div class="admin-loading">Codes load ho rahe hain…</div>';
+  try{
+    const snap = await accessCodesCol().orderBy('createdAt', 'desc').get();
+    if(snap.empty){
+      listEl.innerHTML = '<div class="admin-loading">Abhi koi code nahi bana — upar "Naya code banao" dabao</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    snap.forEach(doc=>{
+      const d = doc.data();
+      const row = document.createElement('div');
+      row.className = 'access-code-row' + (d.used ? ' used' : '');
+      row.innerHTML = `
+        <span class="access-code-val">${doc.id}<span class="plan-chip ${d.plan === 'pro' ? 'pro' : 'basic'}">${(d.plan === 'pro' ? 'pro' : 'basic').toUpperCase()}</span></span>
+        <span class="access-code-status ${d.used ? 'used' : 'avail'}">${d.used ? ('Used by ' + (d.usedBy || '—')) : 'Available'}</span>
+        ${d.used ? '' : `<button type="button" class="access-code-copy" data-code="${doc.id}">Copy</button>`}
+      `;
+      listEl.appendChild(row);
+    });
+    listEl.querySelectorAll('.access-code-copy').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        navigator.clipboard?.writeText(btn.dataset.code);
+        showToast('Code copy ho gaya ✓');
+      });
+    });
+  }catch(e){
+    console.error('load codes failed', e);
+    listEl.innerHTML = '<div class="admin-loading">Load nahi ho saka — internet check karo</div>';
+  }
+}
+
+$('btnGenCode')?.addEventListener('click', async ()=>{
+  const btn = $('btnGenCode');
+  btn.disabled = true;
+  try{
+    const custom = $('genCodeCustom').value.trim().toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    let newCode = custom || randomAccessCode();
+    if(custom){
+      const exists = await accessCodesCol().doc(custom).get();
+      if(exists.exists){ showToast('Ye code pehle se maujood hai — doosra likho'); btn.disabled = false; return; }
+    }
+    await accessCodesCol().doc(newCode).set({
+      plan: $('genCodePlan').value === 'pro' ? 'pro' : 'basic',
+      used: false,
+      usedBy: null,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser
+    });
+    $('genCodeCustom').value = '';
+    showToast('Naya code ban gaya: ' + newCode);
+    loadAccessCodes();
+  }catch(e){
+    console.error('gen code failed', e);
+    showToast('Code nahi ban saka — internet check karo');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+
+/* ---- PWA: install button + auto-updating service worker ---- */
+let deferredInstall = null;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+function syncInstallBtn(){
+  const b = $('btnInstall');
+  if(!b) return;
+  b.style.display = (!isStandalone && (deferredInstall || isIOS)) ? 'inline-block' : 'none';
+}
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredInstall = e; syncInstallBtn(); });
+window.addEventListener('appinstalled', ()=>{ deferredInstall = null; syncInstallBtn(); showToast('App install ho gayi ✓'); });
+$('btnInstall').addEventListener('click', async ()=>{
+  if(deferredInstall){
+    deferredInstall.prompt();
+    await deferredInstall.userChoice;
+    deferredInstall = null;
+    syncInstallBtn();
+  } else if(isIOS){
+    showToast('Safari mein Share dabao, phir "Add to Home Screen"');
+  }
+});
+syncInstallBtn();
+
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg=>{
+    reg.update();
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') reg.update(); });
+  }).catch(()=>{});
+  let swRefreshed = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(swRefreshed || !navigator.serviceWorker.controller) return;
+    swRefreshed = true;
+  });
+}
+
+ensureAdminAccount();
+initAuth();
+</script>
+</body>
+</html>
